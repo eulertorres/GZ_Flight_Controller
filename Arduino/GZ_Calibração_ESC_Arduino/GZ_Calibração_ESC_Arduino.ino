@@ -117,6 +117,7 @@ void loop(){
     start = 0;                                                                          //Set start to 0.
     first_angle = false;                                                                //Set first_angle to false.
     //Confirm the choice on the serial monitor.
+    if(data == '1')Serial.println("Teste motor 1 (frontal direito)");
     if(data == '2')Serial.println("Teste motor 2 (traseiro direito)");
     if(data == '3')Serial.println("Teste motor 3 (traseiro esquerdo)");
     if(data == '4')Serial.println("Teste motor 4 (frontal esquerdo)");
