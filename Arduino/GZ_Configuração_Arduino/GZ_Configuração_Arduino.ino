@@ -638,7 +638,7 @@ void check_receiver_inputs(byte movement){
       receiver_check_byte |= 0b00000010;
       pulse_length = receiver_input_channel_2;
     }
-    if(receiver_input_channel_3 > 1875 || receiver_input_channel_3 < 1625){
+    if(receiver_input_channel_3 > 1750 || receiver_input_channel_3 < 1250){
       trigger = 3;
       receiver_check_byte |= 0b00000100;
       pulse_length = receiver_input_channel_3;
