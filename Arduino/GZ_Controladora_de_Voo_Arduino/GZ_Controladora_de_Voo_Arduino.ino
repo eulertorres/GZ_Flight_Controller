@@ -51,7 +51,7 @@ byte last_channel_1, last_channel_2, last_channel_3, last_channel_4; // Nível d
 byte eeprom_data[36];												 // Dados adquiridos na configuração inicial
 byte highByte, lowByte;												 // Bytes comunicação I²C
 volatile int receiver_input_channel_1, receiver_input_channel_2, receiver_input_channel_3, receiver_input_channel_4; // Dados escalonados receptor
-int counter_channel_1, counter_channel_2, counter_channel_3, counter_channel_4, loop_counter; // Contador Largura de pulso dos canais
+int counter_channel_1, counter_channel_2, counter_channel_3, counter_channel_4, loop_counter; 						 // Contador Largura de pulso dos canais
 int esc_1, esc_2, esc_3, esc_4;										 // Valor final enviado aos ESCs para controle dos motores
 int throttle, battery_voltage;										 // Valor da bateria adquirido pelo divisor de tensão
 int cal_int, start, gyro_address;									 // Endereço da IMU
@@ -106,37 +106,37 @@ void setup(){
   }
 
   //Let's take multiple gyro data samples so we can determine the average gyro offset (calibration).
-  for (cal_int = 0; cal_int < 2000 ; cal_int ++){                           //Take 2000 readings for calibration.
-    if(cal_int % 15 == 0)digitalWrite(12, !digitalRead(12));                //Change the led status to indicate calibration.
-    gyro_signalen();                                                        //Read the gyro output.
-    gyro_axis_cal[1] += gyro_axis[1];                                       //Ad roll value to gyro_roll_cal.
-    gyro_axis_cal[2] += gyro_axis[2];                                       //Ad pitch value to gyro_pitch_cal.
-    gyro_axis_cal[3] += gyro_axis[3];                                       //Ad yaw value to gyro_yaw_cal.
+  for (cal_int = 0; cal_int < 2000 ; cal_int ++){                           //Realiza a leitura de 2000 amostras do giroscópio
+    if(cal_int % 15 == 0)digitalWrite(12, !digitalRead(12));                //Led pisca para indicar calibração
+    gyro_signalen();                                                        //Leitura da saída da IMU
+    gyro_axis_cal[1] += gyro_axis[1];                                       //Acumula o resultado do 1 byte (roll)
+    gyro_axis_cal[2] += gyro_axis[2];                                       //Acumula o resultado do 2 byte (pitch)
+    gyro_axis_cal[3] += gyro_axis[3];                                       //Acumula o resultado do 3 byte (yaw)
     //We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while calibrating the gyro.
     PORTD |= B11110000;                                                     //Porta 4, 5, 6 e 7 em nivel ALTO
-    delayMicroseconds(1000);                                                //Espera 1.5 milisegundos (1500us).
+    delayMicroseconds(1500);                                                //Espera 1.5 milisegundos (1500us). (Desliga o motor)
     PORTD &= B00001111;                                                     //Porta 4, 5, 6 e 7 nivel BAIXO
     delay(3);                                                               //Espera 3 ms
   }
-  //Now that we have 2000 measures, we need to devide by 2000 to get the average gyro offset.
-  gyro_axis_cal[1] /= 2000;                                                 //Divide the roll total by 2000.
-  gyro_axis_cal[2] /= 2000;                                                 //Divide the pitch total by 2000.
-  gyro_axis_cal[3] /= 2000;                                                 //Divide the yaw total by 2000.
+  //Adquirimos a média simples das 2000 amostras para estimar o erro do giroscópio
+  gyro_axis_cal[1] /= 2000;                                                 //Divide o roll  por 2000
+  gyro_axis_cal[3] /= 2000;                                                 //Divide o yaw   por 2000
+  gyro_axis_cal[2] /= 2000;                                                 //Divide o pitch por 2000
 
   PCICR |= (1 << PCIE0);                                                    //Set PCIE0 to enable PCMSK0 scan.
-  PCMSK0 |= (1 << PCINT0);                                                  //Set PCINT0 (digital input 8) to trigger an interrupt on state change.
-  PCMSK0 |= (1 << PCINT1);                                                  //Set PCINT1 (digital input 9)to trigger an interrupt on state change.
-  PCMSK0 |= (1 << PCINT2);                                                  //Set PCINT2 (digital input 10)to trigger an interrupt on state change.
-  PCMSK0 |= (1 << PCINT3);                                                  //Set PCINT3 (digital input 11)to trigger an interrupt on state change.
+  PCMSK0 |= (1 << PCINT0);                                                  //Registrador PCINT0 em alto (entrada digital 8)  para causar uma interrupção em qualquer mudança.
+  PCMSK0 |= (1 << PCINT1);                                                  //Registrador PCINT1 em alto (entrada digital 9)  para causar uma interrupção em qualquer mudança.
+  PCMSK0 |= (1 << PCINT2);                                                  //Registrador PCINT2 em alto (entrada digital 10) para causar uma interrupção em qualquer mudança.
+  PCMSK0 |= (1 << PCINT3);                                                  //Registrador PCINT3 em alto (entrada digital 11) para causar uma interrupção em qualquer mudança.
 
-  //Wait until the receiver is active and the throtle is set to the lower position.
-  while(receiver_input_channel_3 < 1485 || receiver_input_channel_3 > 1520 || receiver_input_channel_4 < 1650){
+  //Espera o throttle estar na menor posição (valor ja convertido em gyro_signalen()) e yaw no meio (impedir que drone realize algum movimento yaw)
+  while(receiver_input_channel_3 < 1730 || receiver_input_channel_3 > 1770 || receiver_input_channel_4 < 1650){
     receiver_input_channel_3 = convert_receiver_channel(3);                 //Escalonamento para a faixa de 1500 a 2000 us (throtle)
     receiver_input_channel_4 = convert_receiver_channel(4);                 //Escalonamento para a faixa de 1500 a 2000 us (yaw)
     start ++;                                                               //Incrementa o contador para piscar a LED a cada 500 ms
     //Envia pulsos de 1500 us aos ESCs bidirecionais (para rotação)
     PORTD |= B11110000;                                                     //Porta 4, 5, 6 e 7 em nivel ALTO
-    delayMicroseconds(1500);                                                //Espera 1.5 milisegundos (1500us).
+    delayMicroseconds(1500);                                                //Espera 1.5 milisegundos (1500us) Para desligar os motores
     PORTD &= B00001111;                                                     //Porta 4, 5, 6 e 7 nivel BAIXO
     delay(3);                                                               //Espera 3 ms
     if(start == 125){                                                       //A cada 500 ms
@@ -146,18 +146,16 @@ void setup(){
   }
   start = 0;                                                                //Reseta a variável
 
-  //Load the battery voltage to the battery_voltage variable.
-  //65 is the voltage compensation for the diode.
-  //12.6V equals ~5V @ Analog 0.
-  //12.6V equals 1023 analogRead(0).
-  //1260 / 1023 = 1.2317.
-  //The variable battery_voltage holds 1050 if the battery voltage is 10.5V.
+  //Cálculo da tensão atual da bateria (importante) [Divisor de tensão R1 = 1K e R2 = 350R]
+  //O diodo apresenta queda de tensão equivalente a 65 (decimal)
+  //A bateria cheia (12,6V) deve mostrar na porta analógica 3.3V (valor máximo da porta analógica do ESP32[projeto final])
+  //12,6V deve ser lido como 1023 na porta analógica A0
+  //1260 / 1023 = 1.2317. Cada valor incrementado representa 0,012 V da bateria (Resolução)
+  //Exemplo: Caso seja lido 787 na porta A0, o valor de tensão da bateria será 10.5 V (tensão_bateria = 1050)
   battery_voltage = (analogRead(0) + 65) * 1.2317;
 
+  digitalWrite(12,LOW);                                                     //Desliga a LED
   loop_timer = micros();                                                    //Set the timer for the next loop.
-
-  //When everything is done, turn off the led.
-  digitalWrite(12,LOW);                                                     //Turn off the warning led.
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Main program loop
@@ -217,9 +215,9 @@ void loop(){
   if(start == 1 && receiver_input_channel_3 < 1550 && receiver_input_channel_4 > 1700){
     start = 2;
 
-    angle_pitch = angle_pitch_acc;                                          //Set the gyro pitch angle equal to the accelerometer pitch angle when the quadcopter is started.
-    angle_roll = angle_roll_acc;                                            //Set the gyro roll angle equal to the accelerometer roll angle when the quadcopter is started.
-    gyro_angles_set = true;                                                 //Set the IMU started flag.
+    angle_pitch = angle_pitch_acc;                                          //Ângulo inicial do pitch será do acelerômetro (gravidade como referência)
+    angle_roll = angle_roll_acc;                                            //Ângulo inicial do roll  será do acelerômetro (gravidade como referência)
+    gyro_angles_set = true;                                                 //Flag para indicar inicio da IMU
 
     //Reset the PID controllers for a bumpless start.
     pid_i_mem_roll = 0;
@@ -232,79 +230,70 @@ void loop(){
   //Para parar os motores: Throttle na menor posição e Yaw todo para direita
   if(start == 2 && receiver_input_channel_3 < 1550 && receiver_input_channel_4 > 1950)start = 0;
 
-  //The PID set point in degrees per second is determined by the roll receiver input.
-  //In the case of deviding by 3 the max roll rate is aprox 164 degrees per second ( (500-8)/3 = 164d/s ).
+  //O ponto de referência do PID é em graus por segundo. O roll será a entrada deste sistema-------------------
+  //Para converter a largura de pulso para graus por segundo, iremos dividir por 1.5. O ângulo maximo será então (250-4)/1.5 = 164 [graus/s]
   pid_roll_setpoint = 0;
-  //We need a little dead band of 16us for better results.
-  if(receiver_input_channel_1 > 1758)pid_roll_setpoint = receiver_input_channel_1 - 1758;
-  else if(receiver_input_channel_1 < 1742)pid_roll_setpoint = receiver_input_channel_1 - 1742;
-
+  //O ponto de referência só é definido quando o canal é +/- 8 us diferente do CENTRO [Evitar flutuaçoes afetarem o PID]
+  if(receiver_input_channel_1 > 1754)pid_roll_setpoint = receiver_input_channel_1 - 1754;
+  else if(receiver_input_channel_1 < 1746)pid_roll_setpoint = receiver_input_channel_1 - 1746;
   pid_roll_setpoint -= roll_level_adjust;                                   //Subtract the angle correction from the standardized receiver roll input value.
-  pid_roll_setpoint /= 3.0;                                                 //Divide the setpoint for the PID roll controller by 3 to get angles in degrees.
+  pid_roll_setpoint /= 1.5;                                                 //Converção para entrada do PID_roll ser em graus por segundo
 
-
-  //The PID set point in degrees per second is determined by the pitch receiver input.
-  //In the case of deviding by 3 the max pitch rate is aprox 164 degrees per second ( (500-8)/3 = 164d/s ).
+  //Entrada do sistema de controle para o pitch -------------------------------------------------------------------------
   pid_pitch_setpoint = 0;
-  //We need a little dead band of 16us for better results.
-  if(receiver_input_channel_2 > 1508)pid_pitch_setpoint = receiver_input_channel_2 - 1508;
-  else if(receiver_input_channel_2 < 1492)pid_pitch_setpoint = receiver_input_channel_2 - 1492;
+  if(receiver_input_channel_2 > 1754)pid_pitch_setpoint = receiver_input_channel_2 - 1754;
+  else if(receiver_input_channel_2 < 1746)pid_pitch_setpoint = receiver_input_channel_2 - 1746;
 
   pid_pitch_setpoint -= pitch_level_adjust;                                  //Subtract the angle correction from the standardized receiver pitch input value.
-  pid_pitch_setpoint /= 3.0;                                                 //Divide the setpoint for the PID pitch controller by 3 to get angles in degrees.
+  pid_pitch_setpoint /= 1.5;                                                 //Converção para entrada do PID_pitch ser em graus por segundo
 
-  //The PID set point in degrees per second is determined by the yaw receiver input.
-  //In the case of deviding by 3 the max yaw rate is aprox 164 degrees per second ( (500-8)/3 = 164d/s ).
+  //Entrada do sistema de controle para o Yaw -------------------------------------------------------------------------
   pid_yaw_setpoint = 0;
   //We need a little dead band of 16us for better results.
-  if(receiver_input_channel_3 > 1050){ //Do not yaw when turning off the motors.
-    if(receiver_input_channel_4 > 1508)pid_yaw_setpoint = (receiver_input_channel_4 - 1508)/3.0;
-    else if(receiver_input_channel_4 < 1492)pid_yaw_setpoint = (receiver_input_channel_4 - 1492)/3.0;
+  if(receiver_input_channel_3 > 1525){ //Não rotacionar o drone quando o throttle tiver em BAIXO
+    if(receiver_input_channel_4 > 1754)pid_yaw_setpoint = (receiver_input_channel_4 - 1754)/1.5;
+    else if(receiver_input_channel_4 < 1746)pid_yaw_setpoint = (receiver_input_channel_4 - 1746)/1.5;
   }
   
-  calculate_pid();                                                            //PID inputs are known. So we can calculate the pid output.
+  calculate_pid();                                                            //Com as entradas prontas para os PIDs, podemos calcular a saída
 
-  //The battery voltage is needed for compensation.
-  //A complementary filter is used to reduce noise.
+  //Compesação do descarga da bateria no contolador PID (com filtro complementar para reudizr o ruído da leitura analógica)
   //0.09853 = 0.08 * 1.2317.
   battery_voltage = battery_voltage * 0.92 + (analogRead(0) + 65) * 0.09853;
+  if(battery_voltage < 1000 && battery_voltage > 600)digitalWrite(12, HIGH); // Aviso caso o nivel da bateria esteja muito baixo
 
-  //Turn on the led if battery voltage is to low.
-  if(battery_voltage < 1000 && battery_voltage > 600)digitalWrite(12, HIGH);
+  throttle = receiver_input_channel_3;                                      //O throttle será o sinal de controle principal
 
+  if (start == 2){                                                          //Motores estão armados
+    if (throttle > 1900) throttle = 1900;                                   //O PID precisa de uma parte da largura de pulso para atuar no drone
+    esc_1 = throttle - pid_output_pitch + pid_output_roll - pid_output_yaw; //Esc 1: Frontal -direito  - anti-horário	||								||
+    esc_2 = throttle + pid_output_pitch + pid_output_roll + pid_output_yaw; //Esc 2: Traseiro direito -  horário		|| IMPORTANTE SEGUIR ESSA ORDEM ||
+    esc_3 = throttle + pid_output_pitch - pid_output_roll - pid_output_yaw; //Esc 3: Traseiro esquerdo - anti-horário   ||								||
+    esc_4 = throttle - pid_output_pitch - pid_output_roll + pid_output_yaw; //Esc 4: Frontal  esquerdo - horário        ||								||
 
-  throttle = receiver_input_channel_3;                                      //We need the throttle signal as a base signal.
-
-  if (start == 2){                                                          //The motors are started.
-    if (throttle > 1800) throttle = 1800;                                   //We need some room to keep full control at full throttle.
-    esc_1 = throttle - pid_output_pitch + pid_output_roll - pid_output_yaw; //Calculate the pulse for esc 1 (front-right - CCW)
-    esc_2 = throttle + pid_output_pitch + pid_output_roll + pid_output_yaw; //Calculate the pulse for esc 2 (rear-right - CW)
-    esc_3 = throttle + pid_output_pitch - pid_output_roll - pid_output_yaw; //Calculate the pulse for esc 3 (rear-left - CCW)
-    esc_4 = throttle - pid_output_pitch - pid_output_roll + pid_output_yaw; //Calculate the pulse for esc 4 (front-left - CW)
-
-    if (battery_voltage < 1240 && battery_voltage > 800){                   //Is the battery connected?
-      esc_1 += esc_1 * ((1240 - battery_voltage)/(float)3500);              //Compensate the esc-1 pulse for voltage drop.
-      esc_2 += esc_2 * ((1240 - battery_voltage)/(float)3500);              //Compensate the esc-2 pulse for voltage drop.
-      esc_3 += esc_3 * ((1240 - battery_voltage)/(float)3500);              //Compensate the esc-3 pulse for voltage drop.
-      esc_4 += esc_4 * ((1240 - battery_voltage)/(float)3500);              //Compensate the esc-4 pulse for voltage drop.
+    if (battery_voltage < 1240 && battery_voltage > 800){                   //Compensa a bateria apenas se tiver entre 8 e 12.4 Volts
+      esc_1 += esc_1 * ((1240 - battery_voltage)/(float)3500);              //Compoensação para o ESC 1 para a descarga da bateria
+      esc_2 += esc_2 * ((1240 - battery_voltage)/(float)3500);              //Compoensação para o ESC 2 para a descarga da bateria
+      esc_3 += esc_3 * ((1240 - battery_voltage)/(float)3500);              //Compoensação para o ESC 3 para a descarga da bateria
+      esc_4 += esc_4 * ((1240 - battery_voltage)/(float)3500);              //Compoensação para o ESC 4 para a descarga da bateria
     } 
 
-    if (esc_1 < 1100) esc_1 = 1100;                                         //Keep the motors running.
-    if (esc_2 < 1100) esc_2 = 1100;                                         //Keep the motors running.
-    if (esc_3 < 1100) esc_3 = 1100;                                         //Keep the motors running.
-    if (esc_4 < 1100) esc_4 = 1100;                                         //Keep the motors running.
+    if (esc_1 < 1100) esc_1 = 1100;                                         //Os motores continuam rodando com o valor de throttle no baixo
+    if (esc_2 < 1100) esc_2 = 1100;                                         //Os motores continuam rodando com o valor de throttle no baixo
+    if (esc_3 < 1100) esc_3 = 1100;                                         //Os motores continuam rodando com o valor de throttle no baixo
+    if (esc_4 < 1100) esc_4 = 1100;                                         //Os motores continuam rodando com o valor de throttle no baixo
 
-    if(esc_1 > 2000)esc_1 = 2000;                                           //Limit the esc-1 pulse to 2000us.
-    if(esc_2 > 2000)esc_2 = 2000;                                           //Limit the esc-2 pulse to 2000us.
-    if(esc_3 > 2000)esc_3 = 2000;                                           //Limit the esc-3 pulse to 2000us.
-    if(esc_4 > 2000)esc_4 = 2000;                                           //Limit the esc-4 pulse to 2000us.  
+    if(esc_1 > 2000)esc_1 = 2000;                                           //Limite da largura de pulso deve ser 2000 us
+    if(esc_2 > 2000)esc_2 = 2000;                                           //Limite da largura de pulso deve ser 2000 us
+    if(esc_3 > 2000)esc_3 = 2000;                                           //Limite da largura de pulso deve ser 2000 us
+    if(esc_4 > 2000)esc_4 = 2000;                                           //Limite da largura de pulso deve ser 2000 us 
   }
 
   else{
-    esc_1 = 1000;                                                           //If start is not 2 keep a 1000us pulse for ess-1.
-    esc_2 = 1000;                                                           //If start is not 2 keep a 1000us pulse for ess-2.
-    esc_3 = 1000;                                                           //If start is not 2 keep a 1000us pulse for ess-3.
-    esc_4 = 1000;                                                           //If start is not 2 keep a 1000us pulse for ess-4.
+    esc_1 = 1500;                                                           //Se não estiver armado, mantém o esc 1 no valor mínimo
+    esc_2 = 1500;                                                           //Se não estiver armado, mantém o esc 2 no valor mínimo
+    esc_3 = 1500;                                                           //Se não estiver armado, mantém o esc 3 no valor mínimo
+    esc_4 = 1500;                                                           //Se não estiver armado, mantém o esc 4 no valor mínimo
   }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -452,41 +441,38 @@ void gyro_signalen(){
 //https://youtu.be/JBvnB0279-Q 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void calculate_pid(){
-  //Roll calculations
-  pid_error_temp = gyro_roll_input - pid_roll_setpoint;
-  pid_i_mem_roll += pid_i_gain_roll * pid_error_temp;
-  if(pid_i_mem_roll > pid_max_roll)pid_i_mem_roll = pid_max_roll;
-  else if(pid_i_mem_roll < pid_max_roll * -1)pid_i_mem_roll = pid_max_roll * -1;
-
+  //Cálculo PID Roll -------------------------------------------------------------------------------------------------------------------------
+  pid_error_temp = gyro_roll_input - pid_roll_setpoint;								// Cálculo do erro do ângulo roll
+  pid_i_mem_roll += pid_i_gain_roll * pid_error_temp;								// Ganho controlador I multiplicado pelo erro
+  if(pid_i_mem_roll > pid_max_roll)pid_i_mem_roll = pid_max_roll;					// Delimita esse valor para ficar entre +/- o valor máximo
+  else if(pid_i_mem_roll < pid_max_roll * -1)pid_i_mem_roll = pid_max_roll * -1;	
+// PID ROLL: ------|		Ganho_P * Erro [P]		 |Ganho_I * Erro [I]| 		Ganho_D * (Erro[i]-Erro[i-1]) [D]                 |------------
   pid_output_roll = pid_p_gain_roll * pid_error_temp + pid_i_mem_roll + pid_d_gain_roll * (pid_error_temp - pid_last_roll_d_error);
-  if(pid_output_roll > pid_max_roll)pid_output_roll = pid_max_roll;
-  else if(pid_output_roll < pid_max_roll * -1)pid_output_roll = pid_max_roll * -1;
+  if(pid_output_roll > pid_max_roll)pid_output_roll = pid_max_roll;					// Delimita esse valor para ficar entre +/- o valor máximo
+  else if(pid_output_roll < pid_max_roll * -1)pid_output_roll = pid_max_roll * -1;	// + 200 ou -200
+  pid_last_roll_d_error = pid_error_temp;											// Salva o erro para o prox cálculo
 
-  pid_last_roll_d_error = pid_error_temp;
-
-  //Pitch calculations
-  pid_error_temp = gyro_pitch_input - pid_pitch_setpoint;
-  pid_i_mem_pitch += pid_i_gain_pitch * pid_error_temp;
-  if(pid_i_mem_pitch > pid_max_pitch)pid_i_mem_pitch = pid_max_pitch;
-  else if(pid_i_mem_pitch < pid_max_pitch * -1)pid_i_mem_pitch = pid_max_pitch * -1;
-
+  //Cálculo PID Pitch -------------------------------------------------------------------------------------------------------------------------
+  pid_error_temp = gyro_pitch_input - pid_pitch_setpoint;							// Cálculo do erro do ângulo roll
+  pid_i_mem_pitch += pid_i_gain_pitch * pid_error_temp;								// Ganho controlador I multiplicado pelo erro
+  if(pid_i_mem_pitch > pid_max_pitch)pid_i_mem_pitch = pid_max_pitch;				// Delimita esse valor para ficar entre +/- o valor máximo
+  else if(pid_i_mem_pitch < pid_max_pitch * -1)pid_i_mem_pitch = pid_max_pitch * -1;// +200 ou -200
+// PID PITCH: ------|		Ganho_P * Erro [P]		  |Ganho_I * Erro [I]| 		Ganho_D * (Erro[i]-Erro[i-1]) [D]          |------------
   pid_output_pitch = pid_p_gain_pitch * pid_error_temp + pid_i_mem_pitch + pid_d_gain_pitch * (pid_error_temp - pid_last_pitch_d_error);
-  if(pid_output_pitch > pid_max_pitch)pid_output_pitch = pid_max_pitch;
-  else if(pid_output_pitch < pid_max_pitch * -1)pid_output_pitch = pid_max_pitch * -1;
-
-  pid_last_pitch_d_error = pid_error_temp;
-
-  //Yaw calculations
-  pid_error_temp = gyro_yaw_input - pid_yaw_setpoint;
-  pid_i_mem_yaw += pid_i_gain_yaw * pid_error_temp;
-  if(pid_i_mem_yaw > pid_max_yaw)pid_i_mem_yaw = pid_max_yaw;
+  if(pid_output_pitch > pid_max_pitch)pid_output_pitch = pid_max_pitch;					// Delimita esse valor para ficar entre +/- o valor máximo
+  else if(pid_output_pitch < pid_max_pitch * -1)pid_output_pitch = pid_max_pitch * -1;  // + 200 ou -200
+  pid_last_pitch_d_error = pid_error_temp;                                              // Salva o erro para o prox cálculo
+  
+  //Cálculo PID Pitch -------------------------------------------------------------------------------------------------------------------------
+  pid_error_temp = gyro_yaw_input - pid_yaw_setpoint;								// Cálculo do erro do ângulo roll
+  pid_i_mem_yaw += pid_i_gain_yaw * pid_error_temp;                             	// Ganho controlador I multiplicado pelo erro
+  if(pid_i_mem_yaw > pid_max_yaw)pid_i_mem_yaw = pid_max_yaw;                   	// Delimita esse valor para ficar entre +/- o valor máximo
   else if(pid_i_mem_yaw < pid_max_yaw * -1)pid_i_mem_yaw = pid_max_yaw * -1;
-
+// PID PITCH: ------|		Ganho_P * Erro [P]	   |Ganho_I*Erro [I]| 		Ganho_D * (Erro[i]-Erro[i-1]) [D]          |----------------------
   pid_output_yaw = pid_p_gain_yaw * pid_error_temp + pid_i_mem_yaw + pid_d_gain_yaw * (pid_error_temp - pid_last_yaw_d_error);
-  if(pid_output_yaw > pid_max_yaw)pid_output_yaw = pid_max_yaw;
-  else if(pid_output_yaw < pid_max_yaw * -1)pid_output_yaw = pid_max_yaw * -1;
-
-  pid_last_yaw_d_error = pid_error_temp;
+  if(pid_output_yaw > pid_max_yaw)pid_output_yaw = pid_max_yaw;						// Delimita esse valor para ficar entre +/- o valor máximo
+  else if(pid_output_yaw < pid_max_yaw * -1)pid_output_yaw = pid_max_yaw * -1;      // + 200 ou -200
+  pid_last_yaw_d_error = pid_error_temp;                                            // Salva o erro para o prox cálculo
 }
 
 //Essa função garante que que os sinais brutos do receptor serão escalonados para a faixa de 1500-2000 uS (configuração unidirecional)
@@ -536,7 +522,7 @@ void set_gyro_registers(){
 
     Wire.beginTransmission(gyro_address);                                      //Inicia nova cominicação I²C com o endereço configurado
     Wire.write(0x1C);                                                          //Escrita no registrador ACCEL_CONFIG endereço 0x1A hex
-    Wire.write(0x10);                                                          //Set the register bits as 00010000 (+/- 8g full scale range)
+    Wire.write(0x10);                                                          //Insere os bits 00010000 (+/- 8g full scale range)
     Wire.endTransmission();                                                    //Termina a transmissão
 
     //Checagem dos registradores
@@ -550,9 +536,9 @@ void set_gyro_registers(){
       while(1)delay(10);                                                       //Fica num loop infinito
     }
 
-    Wire.beginTransmission(gyro_address);                                      //Start communication with the address found during search
+    Wire.beginTransmission(gyro_address);                                      //Inicia a comunicação no endereço encontrado na configuração
     Wire.write(0x1A);                                                          //Escrita no registrador CONFIG register (1A hex)
-    Wire.write(0x03);                                                          //Set the register bits as 00000011 (Set Digital Low Pass Filter to ~43Hz)
+    Wire.write(0x03);                                                          //Insere os bits 00000011 (Filtro passa baixa ~43Hz)
     Wire.endTransmission();                                                    //Termina a transmissão    
 
   }  

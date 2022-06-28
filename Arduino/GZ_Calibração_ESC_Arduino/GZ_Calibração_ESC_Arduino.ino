@@ -111,7 +111,7 @@ void loop(){
     data = Serial.read();                                                               //Read the incomming byte.
     delay(100);                                                                         //Wait for any other bytes to come in
     while(Serial.available() > 0)loop_counter = Serial.read();                          //Empty the Serial buffer.
-    new_function_request = true;                                                        //Set the new request flag.
+    new_function_request = true;                                                        //Sinaliza uma nova entrada de função
     loop_counter = 0;                                                                   //Reset the loop_counter variable.
     cal_int = 0;                                                                        //Reset the cal_int variable to undo the calibration.
     start = 0;                                                                          //Set start to 0.
@@ -136,7 +136,7 @@ void loop(){
   }
 
   receiver_input_channel_3 = convert_receiver_channel(3);                               //Converte os valores recebidos pelo receptor para a escala de 1500-2000us (escala para 1 direção do ESC bidirecional)
-  if(receiver_input_channel_3 < 1520)new_function_request = false;                      //A flag fica false quando o throttle está na menor posição ESC BIDIRECIONAL
+  if(receiver_input_channel_3 < 1520)new_function_request = false;                      //Só permite uma nova função quando o throttle ta em BAIXO
 
 
   ////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,9 +145,9 @@ void loop(){
   if(data == 0 && new_function_request == false){                                       //Apenas inicia o modo de teste na primeira vez de rodar o programa
     receiver_input_channel_3 = convert_receiver_channel(3);                             //Converte os valores recebidos pelo receptor para a escala de 1500-2000us (escala para 1 direção do ESC bidirecional)
     esc_1 = receiver_input_channel_3;                                                   //Largura de pulso do motor 1 igual ao valor do trhottle
-    esc_2 = receiver_input_channel_3;                                                   //Largura de pulso do motor 1 igual ao valor do trhottle
-    esc_3 = receiver_input_channel_3;                                                   //Largura de pulso do motor 1 igual ao valor do trhottle
-    esc_4 = receiver_input_channel_3;                                                   //Largura de pulso do motor 1 igual ao valor do trhottle
+    esc_2 = receiver_input_channel_3;                                                   //Largura de pulso do motor 2 igual ao valor do trhottle
+    esc_3 = receiver_input_channel_3;                                                   //Largura de pulso do motor 3 igual ao valor do trhottle
+    esc_4 = receiver_input_channel_3;                                                   //Largura de pulso do motor 4 igual ao valor do trhottle
     esc_pulse_output();                                                                 //Envia os pulsos para os ESCs
 
   ////////////////////////////////////////////////////////////////////////////////////////////
@@ -261,7 +261,7 @@ void loop(){
         gyro_axis_cal[3] += gyro_axis[3];                                               //Ad yaw value to gyro_yaw_cal.
         //We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while calibrating the gyro.
         PORTD |= B11110000;                                                             //Set digital poort 4, 5, 6 and 7 high.
-		delayMicroseconds(1500);                                                        //Esperar 1500 us
+		delayMicroseconds(1500);                                                        //Esperar 1500 us para parar os motores
         PORTD &= B00001111;                                                             //Set digital poort 4, 5, 6 and 7 low.
         delay(3);                                                                       //Wait 3 milliseconds before the next loop.
       }
@@ -375,10 +375,10 @@ ISR(PCINT0_vect){
 void wait_for_receiver(){
   byte zero = 0;                                                                //Zera os bits
   while(zero < 15){                                                             //Prende o programa enquanto zero nao tiver todos os 4 bits em 1
-    if(receiver_input[1] < 2100 && receiver_input[1] > 1400)zero |= 0b00000001;  //Ativa o bit 0 caso o pulso do canal 1 esteja na faixa de 1400 a 2000 us
-    if(receiver_input[2] < 2100 && receiver_input[2] > 1400)zero |= 0b00000010;  //Ativa o bit 1 caso o pulso do canal 2 esteja na faixa de 1400 a 2000 us
-    if(receiver_input[3] < 2100 && receiver_input[3] > 1400)zero |= 0b00000100;  //Ativa o bit 2 caso o pulso do canal 3 esteja na faixa de 1400 a 2000 us
-    if(receiver_input[4] < 2100 && receiver_input[4] > 1400)zero |= 0b00001000;  //Ativa o bit 3 caso o pulso do canal 4 esteja na faixa de 1400 a 2000 us
+    if(receiver_input[1] < 2100 && receiver_input[1] > 1400)zero |= 0b00000001;  //Ativa o bit 0 caso o pulso bruto do canal 1 esteja na faixa de 1400 a 2100 us
+    if(receiver_input[2] < 2100 && receiver_input[2] > 1400)zero |= 0b00000010;  //Ativa o bit 1 caso o pulso bruto do canal 2 esteja na faixa de 1400 a 2100 us
+    if(receiver_input[3] < 2100 && receiver_input[3] > 1400)zero |= 0b00000100;  //Ativa o bit 2 caso o pulso bruto do canal 3 esteja na faixa de 1400 a 2100 us
+    if(receiver_input[4] < 2100 && receiver_input[4] > 1400)zero |= 0b00001000;  //Ativa o bit 3 caso o pulso bruto do canal 4 esteja na faixa de 1400 a 2100 us
     delay(500);                                                                 //Espera 500 ms
   }
 }
