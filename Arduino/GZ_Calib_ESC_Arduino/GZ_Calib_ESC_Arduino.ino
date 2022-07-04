@@ -1,43 +1,43 @@
-/////CALIBRAÇÃO DO ESC BIDIRECIONAL PARA O DRONE ABELHINHA. YOUTUBE: GRAVIDADE ZERO////
+/////CALIBRAÇÃO DO ESC BIDIRECIONAL PARA O DRONE CRONUS . YOUTUBE: GRAVIDADE ZERO////
 //-------------------------------------------------------------------------------------
-//									Termos de uso									  |
-//ESTE SOFTWARE FOI DISTRIBUÍDO EM SEU ESTADO ATUAL, SEM NENHUMA GARANTIA, DE FORMA	  |
-//IMPLÍCITA OU EXPLÍCITA. DESIGNADO PARA USO PESSOAL.								  |
+//                                    Termos de uso                                   |
+//ESTE SOFTWARE FOI DISTRIBUÍDO EM SEU ESTADO ATUAL, SEM NENHUMA GARANTIA, DE FORMA   |
+//IMPLÍCITA OU EXPLÍCITA. DESIGNADO PARA USO PESSOAL.                                 |
 //OS AUTORES NÃO SÃO RESPONSÁVEIS POR QUALQUER DANO CAUSADO PELO USO DESTE SOFTWARE.  |
 //-------------------------------------------------------------------------------------
-//								NOTA DE SEGURANÇA									  |																
-//SEMPRE REMOVA AS HÉLICES ANTES DE REALIZAR QUALQUER TESTE,						  |
-//A MENOS QUE VOCÊ SAIBA O QUE ESTÁ FAZENDO.										  |
+//                                NOTA DE SEGURANÇA                                   |                               
+//SEMPRE REMOVA AS HÉLICES ANTES DE REALIZAR QUALQUER TESTE,                          |
+//A MENOS QUE VOCÊ SAIBA O QUE ESTÁ FAZENDO.                                          |
 //-------------------------------------------------------------------------------------
-//								NOTA DE SEGURANÇA 2									  |
-//ESTE SOFTWARE APENAS FUNCIONA PARA ESCs BIDIRECIONAIS, OU SEJA,					  |
-//ESC's EM QUE O PONTO MORTO DO MOTOR É 1500us DE LARGURA DE PULSO, CUIDADO.		  |
-//O USO DE UM ESC UNIDIRECIONAL PODE RESULTAR EM ACIDENTES OU ATÉ PERDA TOTAL DOS	  |
+//                                NOTA DE SEGURANÇA 2                                 |
+//ESTE SOFTWARE APENAS FUNCIONA PARA ESCs BIDIRECIONAIS, OU SEJA,                     |
+//ESC's EM QUE O PONTO MORTO DO MOTOR É 1500us DE LARGURA DE PULSO, CUIDADO.          |
+//O USO DE UM ESC UNIDIRECIONAL PODE RESULTAR EM ACIDENTES OU ATÉ PERDA TOTAL DOS     |
 //COMPONENTES, POIS O MOTOR NÃO RECEBERÁ O COMANDO PARA PARAR, OU O ESC NÃO IRÁ ARMAR.|
 //-------------------------------------------------------------------------------------
-//ESTE PROGRAMA FOI BASEADO NO TRABALHO PRÉVIO DE JOOP BROOKING, SENDO TRADUZIDO E	  |
-//ADAPTADO PARA O PROJETO COM ESC BIDIRECIONAL LIMITADO À UMA DIREÇÃO				  |
-//FONTE: http://www.brokking.net/ymfc-al_main.html									  |
+//ESTE PROGRAMA FOI BASEADO NO TRABALHO PRÉVIO DE JOOP BROOKING, SENDO TRADUZIDO E    |
+//ADAPTADO PARA O PROJETO COM ESC BIDIRECIONAL LIMITADO À UMA DIREÇÃO                 |
+//FONTE: http://www.brokking.net/ymfc-al_main.html                                    |
 //AGRADECIMENTOS AO JOOP BROOKING POR CONTRIBUIR COM A DISSEMINAÇÃO DE CONHECIMENTOS  |
 //SOBRE O UNIVERSO DOS VANTS. CANAL: https://www.youtube.com/user/MacPuffdog/featured |
 //-------------------------------------------------------------------------------------
 
-			//=================================================================
-			//COMANDOS SERIAIS PARA O TESTE OU CALIBRAÇÃO					  |
-			//r = Mostrar os valores adquiridos pelo receptor				  |
-			//a = Mostrar os valores convertidos da IMU			  			  |
-			//1 = Checar a rotação e vibração do motor 1  (frontal direito)   |
-			//2 = Checar a rotação e vibração do motor 2  (traseiro direito)  |
-			//3 = Checar a rotação e vibração do motor 3  (traseiro esquerdo) |
-			//4 = Checar a rotação e vibração do motor 4  (frontal esquerdo)  | 
-			//5 = Checar vibração de todos os motores simultaneamente		  |
-			//=================================================================
+      //=================================================================
+      //COMANDOS SERIAIS PARA O TESTE OU CALIBRAÇÃO                     |
+      //r = Mostrar os valores adquiridos pelo receptor                 |
+      //a = Mostrar os valores convertidos da IMU                       |
+      //1 = Checar a rotação e vibração do motor 1  (frontal direito)   |
+      //2 = Checar a rotação e vibração do motor 2  (traseiro direito)  |
+      //3 = Checar a rotação e vibração do motor 3  (traseiro esquerdo) |
+      //4 = Checar a rotação e vibração do motor 4  (frontal esquerdo)  | 
+      //5 = Checar vibração de todos os motores simultaneamente         |
+      //=================================================================
 
-#include <Wire.h>        //Biblioteca para comunicação i²C com a IMU
-#include <EEPROM.h>      //Comunicação com a memória EEPROM da ESP32
 
-//Varíaveis globais
-int debug = 0;
+#include <Wire.h>                                    //Biblioteca para comunicação i²C com a IMU
+#include <EEPROM.h>                                  //Comunicação com a memória EEPROM do Arduino
+
+//Declaring global variables
 byte last_channel_1, last_channel_2, last_channel_3, last_channel_4;
 byte eeprom_data[36], start, data;
 boolean new_function_request,first_angle;
@@ -57,104 +57,106 @@ float angle_roll_acc, angle_pitch_acc, angle_pitch, angle_roll;
 int cal_int;
 double gyro_axis_cal[4];
 
-//Rotina de configuração
+//Setup routine
 void setup(){
-  Serial.begin(57600);                                                                  //Start the serial port.
-  Wire.begin();                                                                         //Start the wire library as master
-  TWBR = 12;                                                                            //Set the I2C clock speed to 400kHz.
+  Serial.begin(57600);                                                                  //Inicia comunicação serial
+  Wire.begin();                                                                         //Biblioteca comunicação i2c como mestre
+  TWBR = 12;                                                                            //Clock i²c 400KHz (máximo IMU e ADS)
 
-  //Arduino Uno pins default to inputs, so they don't need to be explicitly declared as inputs.
-  DDRD |= B11110000;                                                                    //Configure digital poort 4, 5, 6 and 7 as output.
-  DDRB |= B00010000;                                                                    //Configure digital poort 12 as output.
+  //Portas de saída do arduino
+  DDRD |= B11110000;                                                                    //Portas 4, 5, 6 e 7 (sinal para os escs)
+  DDRB |= B00010000;                                                                    //Porta 12, LED
 
-  PCICR |= (1 << PCIE0);                                                                // set PCIE0 to enable PCMSK0 scan.
-  PCMSK0 |= (1 << PCINT0);                                                              // set PCINT0 (digital input 8) to trigger an interrupt on state change.
-  PCMSK0 |= (1 << PCINT1);                                                              // set PCINT1 (digital input 9)to trigger an interrupt on state change.
-  PCMSK0 |= (1 << PCINT2);                                                              // set PCINT2 (digital input 10)to trigger an interrupt on state change.
-  PCMSK0 |= (1 << PCINT3);                                                              // set PCINT3 (digital input 11)to trigger an interrupt on state change.
+  PCICR |= (1 << PCIE0);                                                                // Registrador PCIE0  em alto para habilitar scaneamento de interrupção do PCMSK0.
+  PCMSK0 |= (1 << PCINT0);                                                              // Registrador PCINT0 em alto para habilitar interrupão nos pino 8  em qualquer mudança
+  PCMSK0 |= (1 << PCINT1);                                                              // Registrador PCINT1 em alto para habilitar interrupão nos pino 9  em qualquer mudança
+  PCMSK0 |= (1 << PCINT2);                                                              // Registrador PCINT2 em alto para habilitar interrupão nos pino 10 em qualquer mudança
+  PCMSK0 |= (1 << PCINT3);                                                              // Registrador PCINT3 em alto para habilitar interrupão nos pino 11 em qualquer mudança
 
-  for(data = 0; data <= 35; data++)eeprom_data[data] = EEPROM.read(data);               //Read EEPROM for faster data access
+  for(data = 0; data <= 35; data++)eeprom_data[data] = EEPROM.read(data);               //Lê a memória EEPROM, configurada em "GZ_Config_Arduino"
 
-  gyro_address = eeprom_data[32];                                                       //Store the gyro address in the variable.
+  gyro_address = eeprom_data[32];                                                       //Endereço encontrado para a IMU
 
-  set_gyro_registers();                                                                 //Set the specific gyro registers.
+  set_gyro_registers();                                                                 //Configuração de escalas e resoluções da IMU
 
-  //Check the EEPROM signature to make sure that the setup program is executed.
+  //Assinatura na memória EEPROM de JOOP Brookling (programa original)
   while(eeprom_data[33] != 'J' || eeprom_data[34] != 'M' || eeprom_data[35] != 'B'){
-    delay(500);                                                                         //Wait for 500ms.
-    digitalWrite(12, !digitalRead(12));                                                 //Change the led status to indicate error.
+    delay(500);                                                                         //Espera 0.5 segundos
+    digitalWrite(12, !digitalRead(12));                                                 //Se não houver a assinatura liga o led pra indicar erro
   }
-  wait_for_receiver();                                                                  //Wait until the receiver is active.
-  zero_timer = micros();                                                                //Set the zero_timer for the first loop.
-
-  Serial.println("			Lista de comandos			");
+  wait_for_receiver();                                                                  //Espera valores válidos do receptor
+  Serial.println("              Lista de comandos            ");
   Serial.println(" Retire as hélices, escreva o cracatere e envie no campo serial");
   Serial.println("r = Mostrar os valores adquiridos pelo receptor");
-  Serial.println("a = Mostrar os valores convertidos da IMU	");
+  Serial.println("a = Mostrar os valores convertidos da IMU ");
   Serial.println("1 = Checar a rotação e vibração do motor 1  (frontal direito)");
   Serial.println("2 = Checar a rotação e vibração do motor 2  (traseiro direito)");
   Serial.println("3 = Checar a rotação e vibração do motor 3  (traseiro esquerdo)");
   Serial.println("4 = Checar a rotação e vibração do motor 4  (frontal esquerdo) ");
-  Serial.println("5 = Checar vibração de todos os motores simultaneamente	");
+  Serial.println("5 = Checar vibração de todos os motores simultaneamente ");
+  zero_timer = micros();                                                                //Zera o timer para o primeiro loop
 
-  while(Serial.available())data = Serial.read();                                        //Empty the serial buffer.
-  data = 0;                                                                             //Set the data variable back to zero.
-
+  while(Serial.available())data = Serial.read();                                        //Limpa o buffer serial
+  data = 0;                                                                             //Zera os dados
 }
 
 //Main program loop
 void loop(){
-  while(zero_timer + 4000 > micros());                                                  //Start the pulse after 4000 micro seconds.
-  zero_timer = micros();                                                                //Reset the zero timer.
+  while(zero_timer + 4000 > micros());                                                  //Começa depois de 4000 us
+  zero_timer = micros();                                                                //Zera o timer para os próximos 4000 us
 
   if(Serial.available() > 0){
-    data = Serial.read();                                                               //Read the incomming byte.
-    delay(100);                                                                         //Wait for any other bytes to come in
-    while(Serial.available() > 0)loop_counter = Serial.read();                          //Empty the Serial buffer.
-    new_function_request = true;                                                        //Sinaliza uma nova entrada de função
-    loop_counter = 0;                                                                   //Reset the loop_counter variable.
-    cal_int = 0;                                                                        //Reset the cal_int variable to undo the calibration.
-    start = 0;                                                                          //Set start to 0.
-    first_angle = false;                                                                //Set first_angle to false.
+    data = Serial.read();                                                               //Faz a leitura da entrada do teclado
+    delay(100);                                                                         //Espera a chegada dos demais bytes
+    while(Serial.available() > 0)loop_counter = Serial.read();                          //Limpa buffer serial (descarta bytes extras)
+    new_function_request = true;                                                        //Flag para nova operação = TRUE
+    loop_counter = 0;                                                                   //Contador do loop
+    cal_int = 0;                                                                        //Cal_int = 0 fara o giroscópio calibrar novamente
+    start = 0;                                                                          //Motores parados
+    first_angle = false;                                                                //Primeiro ângulo = falso
     //Confirm the choice on the serial monitor.
-    if(data == '1')Serial.println("Teste motor 1 (frontal direito)");
-    if(data == '2')Serial.println("Teste motor 2 (traseiro direito)");
-    if(data == '3')Serial.println("Teste motor 3 (traseiro esquerdo)");
-    if(data == '4')Serial.println("Teste motor 4 (frontal esquerdo)");
-    if(data == '5')Serial.println("Testee todos os motores simultaneamente");
+    if(data == 'r')Serial.println("Lendo valores brutos do receptor. Aguarde");
+    if(data == 'a')Serial.println("Lendo os ângulos do giroscópio");
+    if(data == 'a')Serial.println("Não mecha o drone, a calibração está sendo feita");
+    if(data == '1')Serial.println("Teste do motor 1 (Frontal direito [anti-horário])");
+    if(data == '2')Serial.println("Teste do motor 2 (Traseiro direito [horário])");
+    if(data == '3')Serial.println("Teste do motor 3 (Traseiro esquerdo [anti-horário])");
+    if(data == '4')Serial.println("Teste do motor 4 (Frontal esquerdo [horário])");
+    if(data == '5')Serial.println("Teste de todos os motores simultaneamente");
 
-    // O pulso de 1500 irá armar os ESCs (BIDIRECIONAIS) e deixar os motores parados
-    for(vibration_counter = 0; vibration_counter < 625; vibration_counter++){           //Do this loop 625 times
-      delay(3);                                                                         //Wait 3000us.
-      esc_1 = 1500;                                                                     //Pulso de 1500us para o ESC1 (parar motor)
-      esc_2 = 1500;                                                                     //Pulso de 1500us para o ESC2 (parar motor)
-      esc_3 = 1500;                                                                     //Pulso de 1500us para o ESC3 (parar motor).
-      esc_4 = 1500;                                                                     //Pulso de 1500us para o ESC4 (parar motor)
-      esc_pulse_output();                                                               //Envia os pulsos para os ESCs
+    //Delay para a mensagem aparecer por 2.5 segundos
+    //Enquanto isso, envia pulsos de largura de 1500 us para o ESC bidirecional desativar os motores
+    for(vibration_counter = 0; vibration_counter < 625; vibration_counter++){           //A variável vibration_counter apenas faz a contagem
+      delay(2.5);                                                                       //Espera 2500 us
+      esc_1 = 1500;                                                                     //Envia pulsos de 1500 us para o ESC 1
+      esc_2 = 1500;                                                                     //Envia pulsos de 1500 us para o ESC 2
+      esc_3 = 1500;                                                                     //Envia pulsos de 1500 us para o ESC 3
+      esc_4 = 1500;                                                                     //Envia pulsos de 1500 us para o ESC 4
+      esc_pulse_output();                                                               //Envia os pulsos configurads
     }
-    vibration_counter = 0;                                                              //Reseta a contagem de vibrações
+    vibration_counter = 0;                                                              //Zera a contagem
   }
 
-  receiver_input_channel_3 = convert_receiver_channel(3);                               //Converte os valores recebidos pelo receptor para a escala de 1500-2000us (escala para 1 direção do ESC bidirecional)
-  if(receiver_input_channel_3 < 1520)new_function_request = false;                      //Só permite uma nova função quando o throttle ta em BAIXO
+  receiver_input_channel_3 = convert_receiver_channel(3);                               //Convert the actual receiver signals for throttle to the standard 1000 - 2000us.
+  if(receiver_input_channel_3 < 1512)new_function_request = false;                      //If the throttle is in the lowest position set the request flag to false.
 
 
   ////////////////////////////////////////////////////////////////////////////////////////////
-  //Teste dos ESCs
+  //Run the ESC calibration program to start with.
   ////////////////////////////////////////////////////////////////////////////////////////////
-  if(data == 0 && new_function_request == false){                                       //Apenas inicia o modo de teste na primeira vez de rodar o programa
-    receiver_input_channel_3 = convert_receiver_channel(3);                             //Converte os valores recebidos pelo receptor para a escala de 1500-2000us (escala para 1 direção do ESC bidirecional)
-    esc_1 = receiver_input_channel_3;                                                   //Largura de pulso do motor 1 igual ao valor do trhottle
-    esc_2 = receiver_input_channel_3;                                                   //Largura de pulso do motor 2 igual ao valor do trhottle
-    esc_3 = receiver_input_channel_3;                                                   //Largura de pulso do motor 3 igual ao valor do trhottle
-    esc_4 = receiver_input_channel_3;                                                   //Largura de pulso do motor 4 igual ao valor do trhottle
-    esc_pulse_output();                                                                 //Envia os pulsos para os ESCs
+  if(data == 0 && new_function_request == false){                                       //Only start the calibration mode at first start. 
+    receiver_input_channel_3 = convert_receiver_channel(3);                             //Convert the actual receiver signals for throttle to the standard 1000 - 2000us.
+    esc_1 = receiver_input_channel_3;                                                   //Set the pulse for motor 1 equal to the throttle channel.
+    esc_2 = receiver_input_channel_3;                                                   //Set the pulse for motor 2 equal to the throttle channel.
+    esc_3 = receiver_input_channel_3;                                                   //Set the pulse for motor 3 equal to the throttle channel.
+    esc_4 = receiver_input_channel_3;                                                   //Set the pulse for motor 4 equal to the throttle channel.
+    esc_pulse_output();                                                                 //Send the ESC control pulses.
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////////////
   //When user sends a 'r' print the receiver signals.
   ////////////////////////////////////////////////////////////////////////////////////////////
   if(data == 'r'){
-	Serial.println("Lendo valores do receptor");
     loop_counter ++;                                                                    //Increase the loop_counter variable.
     receiver_input_channel_1 = convert_receiver_channel(1);                           //Convert the actual receiver signals for pitch to the standard 1000 - 2000us.
     receiver_input_channel_2 = convert_receiver_channel(2);                           //Convert the actual receiver signals for roll to the standard 1000 - 2000us.
@@ -162,50 +164,46 @@ void loop(){
     receiver_input_channel_4 = convert_receiver_channel(4);                           //Convert the actual receiver signals for yaw to the standard 1000 - 2000us.
 
     if(loop_counter == 125){                                                            //Print the receiver values when the loop_counter variable equals 250.
-	Serial.println("Debug numero: %d"), debug; debug++;
       print_signals();                                                                  //Print the receiver values on the serial monitor.
       loop_counter = 0;                                                                 //Reset the loop_counter variable.
     }
 
-    //Para ativar os motores:   start: |0 = parado|1 = preparando|2 = armado|
-	//Passo 1: coloque o throttle no nível BAIXO (1500 uS) e YAW para a esquerda (1500 uS).
-    if(receiver_input_channel_3 < 1550 && receiver_input_channel_4 < 1550)start = 1;
-    //Passo 2: Coloque o Yaw na posição centro (1750 uS)
-    if(start == 1 && receiver_input_channel_3 < 1550 && receiver_input_channel_4 > 1700)start = 2;
-    //para parar os motores:
-	//Coloque o throttle em nivel BAIXO (1500 uS) e YAW par a direita (2000 uS)
-    if(start == 2 && receiver_input_channel_3 < 1550 && receiver_input_channel_4 > 1950)start = 0;
+    //For starting the motors: throttle low and yaw left (step 1).
+    if(receiver_input_channel_3 < 1525 && receiver_input_channel_4 < 1525)start = 1;
+    //When yaw stick is back in the center position start the motors (step 2).
+    if(start == 1 && receiver_input_channel_3 < 1525 && receiver_input_channel_4 > 1725)start = 2;
+    //Stopping the motors: throttle low and yaw right.
+    if(start == 2 && receiver_input_channel_3 < 1525 && receiver_input_channel_4 > 1950)start = 0;
 
-    esc_1 = 1500;                                                                       //Set the pulse for ESC 1 to 1500us.
-    esc_2 = 1500;                                                                       //Set the pulse for ESC 2 to 1500us.
-    esc_3 = 1500;                                                                       //Set the pulse for ESC 3 to 15000us.
-    esc_4 = 1500;                                                                       //Set the pulse for ESC 4 to 1500us.
+    esc_1 = 1500;                                                                       //Set the pulse for ESC 1 to 1000us.
+    esc_2 = 1500;                                                                       //Set the pulse for ESC 1 to 1000us.
+    esc_3 = 1500;                                                                       //Set the pulse for ESC 1 to 1000us.
+    esc_4 = 1500;                                                                       //Set the pulse for ESC 1 to 1000us.
     esc_pulse_output();                                                                 //Send the ESC control pulses.
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////
-  //Teste individual ou em conjunto dos motores (1,2,3,4 ou 5(conjunto))
+  //When user sends a '1, 2, 3, 4 or 5 test the motors.
   ////////////////////////////////////////////////////////////////////////////////////////////
-  if(data == '1' || data == '2' || data == '3' || data == '4' || data == '5'){          //Dado inserido
-    loop_counter ++;                                                                    //Printa os valores quando o chega a 250 loops
-    if(new_function_request == true && loop_counter == 250){                            //Espera o usuário colocar o throttle em BAIXO	
-      Serial.print("Coloca o trhottle no BAIXO (1500 uS). Atualmente está em: ");       //Aviso
-      Serial.print(receiver_input_channel_3);                                           //Imprime a posição atual (bruta)
-	  Serial.println("uS");
-      loop_counter = 0;                                                                 //Reseta o contador
+  if(data == '1' || data == '2' || data == '3' || data == '4' || data == '5'){          //If motor 1, 2, 3 or 4 is selected by the user.
+    loop_counter ++;                                                                    //Add 1 to the loop_counter variable.
+    if(new_function_request == true && loop_counter == 250){                            //Wait for the throttle to be set to 0.
+      Serial.print("Set throttle to 1000 (low). It's now set to: ");                    //Print message on the serial monitor.
+      Serial.println(receiver_input_channel_3);                                         //Print the actual throttle position.
+      loop_counter = 0;                                                                 //Reset the loop_counter variable.
     }
-    if(new_function_request == false){                                                  //Quando o throttle tiver na menor posição
-      receiver_input_channel_3 = convert_receiver_channel(3);                           //Escalona o sinal do throttle para (1500 a 2000)
-      if(data == '1' || data == '5')esc_1 = receiver_input_channel_3;                   //Se o teste é o motor 1, ou em todos, envia um pulso com o valor escalonado
-      else esc_1 = 1500;                                                                //Desliga o motor caso não esteja sendo usado (1500 uS)
-      if(data == '2' || data == '5')esc_2 = receiver_input_channel_3;                   //Se o teste é o motor 2, ou em todos, envia um pulso com o valor escalonado
-      else esc_2 = 1500;                                                                //Desliga o motor caso não esteja sendo usado (1500 uS)
-      if(data == '3' || data == '5')esc_3 = receiver_input_channel_3;                   //Se o teste é o motor 3, ou em todos, envia um pulso com o valor escalonado
-      else esc_3 = 1500;                                                                //Desliga o motor caso não esteja sendo usado (1500 uS)
-      if(data == '4' || data == '5')esc_4 = receiver_input_channel_3;                   //Se o teste é o motor 4, ou em todos, envia um pulso com o valor escalonado
-      else esc_4 = 1500;                                                                //Desliga o motor caso não esteja sendo usado (1500 uS)
+    if(new_function_request == false){                                                  //When the throttle was in the lowest position do this.
+      receiver_input_channel_3 = convert_receiver_channel(3);                           //Convert the actual receiver signals for throttle to the standard 1000 - 2000us.
+      if(data == '1' || data == '5')esc_1 = receiver_input_channel_3;                   //If motor 1 is requested set the pulse for motor 1 equal to the throttle channel.
+      else esc_1 = 1500;                                                                //If motor 1 is not requested set the pulse for the ESC to 1000us (off).
+      if(data == '2' || data == '5')esc_2 = receiver_input_channel_3;                   //If motor 2 is requested set the pulse for motor 1 equal to the throttle channel.
+      else esc_2 = 1500;                                                                //If motor 2 is not requested set the pulse for the ESC to 1000us (off).
+      if(data == '3' || data == '5')esc_3 = receiver_input_channel_3;                   //If motor 3 is requested set the pulse for motor 1 equal to the throttle channel.
+      else esc_3 = 1500;                                                                //If motor 3 is not requested set the pulse for the ESC to 1000us (off).
+      if(data == '4' || data == '5')esc_4 = receiver_input_channel_3;                   //If motor 4 is requested set the pulse for motor 1 equal to the throttle channel.
+      else esc_4 = 1500;                                                                //If motor 4 is not requested set the pulse for the ESC to 1000us (off).
 
-      esc_pulse_output();                                                               //Envia os valores de largura de puso para os ESCs
+      esc_pulse_output();                                                               //Send the ESC control pulses.
 
       //For balancing the propellors it's possible to use the accelerometer to measure the vibrations.
       if(eeprom_data[31] == 1){                                                         //The MPU-6050 is installed
@@ -218,13 +216,13 @@ void loop(){
         acc_y = Wire.read()<<8|Wire.read();                                             //Add the low and high byte to the acc_y variable.
         acc_z = Wire.read()<<8|Wire.read();                                             //Add the low and high byte to the acc_z variable.
 
-        acc_total_vector[0] = sqrt((acc_x*acc_x)+(acc_y*acc_y)+(acc_z*acc_z));          //Cálculo do valor total mais recente do acelerômetro
+        acc_total_vector[0] = sqrt((acc_x*acc_x)+(acc_y*acc_y)+(acc_z*acc_z));          //Calculate the total accelerometer vector.
 
-        acc_av_vector = acc_total_vector[0];                                            //Atualiza o valor mais recente do acelerômetro
+        acc_av_vector = acc_total_vector[0];                                            //Copy the total vector to the accelerometer average vector variable.
 
-        for(start = 16; start > 0; start--){                                            //Loop para criar a MÉDIA MÓVEL dos valores totais do acelerômetro
-          acc_av_vector += acc_total_vector[start];                                     //Adiciona o valor deslocado anteriormente
-          acc_total_vector[start] = acc_total_vector[start - 1];                        //Desloca todos os valores para preencher o vetor
+        for(start = 16; start > 0; start--){                                            //Do this loop 16 times to create an array of accelrometer vectors.
+          acc_total_vector[start] = acc_total_vector[start - 1];                        //Shift every variable one position up in the array.
+          acc_av_vector += acc_total_vector[start];                                     //Add the array value to the acc_av_vector variable.
         }
 
         acc_av_vector /= 17;                                                            //Divide the acc_av_vector by 17 to get the avarage total accelerometer vector.
@@ -245,8 +243,7 @@ void loop(){
   //When user sends a 'a' display the quadcopter angles.
   ////////////////////////////////////////////////////////////////////////////////////////////
   if(data == 'a'){
-	Serial.println("Vizualizar valores dos ângulos adquiridos");
-	Serial.println("Calbração do giroscópio (Não mecha o drone).");
+
     if(cal_int != 2000){
       Serial.print("Calibrating the gyro");
       //Let's take multiple gyro data samples so we can determine the average gyro offset (calibration).
@@ -261,7 +258,7 @@ void loop(){
         gyro_axis_cal[3] += gyro_axis[3];                                               //Ad yaw value to gyro_yaw_cal.
         //We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while calibrating the gyro.
         PORTD |= B11110000;                                                             //Set digital poort 4, 5, 6 and 7 high.
-		delayMicroseconds(1500);                                                        //Esperar 1500 us para parar os motores
+        delayMicroseconds(1500);                                                        //Wait 1000us.
         PORTD &= B00001111;                                                             //Set digital poort 4, 5, 6 and 7 low.
         delay(3);                                                                       //Wait 3 milliseconds before the next loop.
       }
@@ -274,7 +271,7 @@ void loop(){
     else{
       ///We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while calibrating the gyro.
       PORTD |= B11110000;                                                               //Set digital poort 4, 5, 6 and 7 high.
-      delayMicroseconds(1500);                                                          //Esperar 1500 us
+      delayMicroseconds(1500);                                                          //Wait 1000us.
       PORTD &= B00001111;                                                               //Set digital poort 4, 5, 6 and 7 low.
 
       //Let's get the current gyro data.
@@ -319,7 +316,7 @@ void loop(){
     }
   }
 }
-}
+
 
 
 //This routine is called every time input 8, 9, 10 or 11 changed state.
@@ -371,21 +368,20 @@ ISR(PCINT0_vect){
   }
 }
 
-//Checar se os valores brutos do receptor RC são validos (bidirecional na configuração unidirecional)
+//Checck if the receiver values are valid within 10 seconds
 void wait_for_receiver(){
-  byte zero = 0;                                                                //Zera os bits
-  while(zero < 15){                                                             //Prende o programa enquanto zero nao tiver todos os 4 bits em 1
-    if(receiver_input[1] < 2100 && receiver_input[1] > 1400)zero |= 0b00000001;  //Ativa o bit 0 caso o pulso bruto do canal 1 esteja na faixa de 1400 a 2100 us
-    if(receiver_input[2] < 2100 && receiver_input[2] > 1400)zero |= 0b00000010;  //Ativa o bit 1 caso o pulso bruto do canal 2 esteja na faixa de 1400 a 2100 us
-    if(receiver_input[3] < 2100 && receiver_input[3] > 1400)zero |= 0b00000100;  //Ativa o bit 2 caso o pulso bruto do canal 3 esteja na faixa de 1400 a 2100 us
-    if(receiver_input[4] < 2100 && receiver_input[4] > 1400)zero |= 0b00001000;  //Ativa o bit 3 caso o pulso bruto do canal 4 esteja na faixa de 1400 a 2100 us
-    delay(500);                                                                 //Espera 500 ms
+  byte zero = 0;                                                                //Set all bits in the variable zero to 0
+  while(zero < 15){                                                             //Stay in this loop until the 4 lowest bits are set
+    if(receiver_input[1] < 2100 && receiver_input[1] > 900)zero |= 0b00000001;  //Set bit 0 if the receiver pulse 1 is within the 900 - 2100 range
+    if(receiver_input[2] < 2100 && receiver_input[2] > 900)zero |= 0b00000010;  //Set bit 1 if the receiver pulse 2 is within the 900 - 2100 range
+    if(receiver_input[3] < 2100 && receiver_input[3] > 900)zero |= 0b00000100;  //Set bit 2 if the receiver pulse 3 is within the 900 - 2100 range
+    if(receiver_input[4] < 2100 && receiver_input[4] > 900)zero |= 0b00001000;  //Set bit 3 if the receiver pulse 4 is within the 900 - 2100 range
+    delay(500);                                                                 //Wait 500 milliseconds
   }
 }
 
-//Essa função garante que que os sinais brutos do receptor serão escalonados para a faixa de 1500-2000 uS (configuração unidirecional)
-//**********Esta faixa é apenas para ESC's BIDIRECIONAIS. ESCs unidirecionais não serão armados ou o motor não consigirá parar************
-//Os dados armazenados na memória EEPROM (baixo, medio e alto) calibrados são utilizados aqui
+//This part converts the actual receiver signals to a standardized 1000 – 1500 – 2000 microsecond value.
+//The stored data in the EEPROM is used.
 int convert_receiver_channel(byte function){
   byte channel, reverse;                                                       //First we declare some local variables
   int low, center, high, actual;
@@ -402,21 +398,21 @@ int convert_receiver_channel(byte function){
 
   if(actual < center){                                                         //The actual receiver value is lower than the center value
     if(actual < low)actual = low;                                              //Limit the lowest value to the value that was detected during setup
-    difference = ((long)(center - actual) * (long)500) / (center - low);       //Calculate and scale the actual value to a 1000 - 2000us value
-    if(reverse == 1)return 1750 + difference/2;                                  //If the channel is reversed
-    else return 1750 - difference/2;                                             //If the channel is not reversed
+    difference = ((long)(center - actual) * (long)250) / (center - low);       //Calculate and scale the actual value to a 1000 - 2000us value
+    if(reverse == 1)return 1750 + difference;                                  //If the channel is reversed
+    else return 1750 - difference;                                             //If the channel is not reversed
   }
   else if(actual > center){                                                                        //The actual receiver value is higher than the center value
     if(actual > high)actual = high;                                            //Limit the lowest value to the value that was detected during setup
-    difference = ((long)(actual - center) * (long)500) / (high - center);      //Calculate and scale the actual value to a 1000 - 2000us value
-    if(reverse == 1)return 1750 + difference/2;                                  //If the channel is reversed
-    else return 1750 + difference/2;                                             //If the channel is not reversed
+    difference = ((long)(actual - center) * (long)250) / (high - center);      //Calculate and scale the actual value to a 1000 - 2000us value
+    if(reverse == 1)return 1750 - difference;                                  //If the channel is reversed
+    else return 1750 + difference;                                             //If the channel is not reversed
   }
   else return 1750;
 }
 
-void print_signals(){													//Mostra a direção que o drone deve ir baseado nos sinais adquiridos
-  Serial.print("Start:");												//Situação atual do motor
+void print_signals(){
+  Serial.print("Start:");
   Serial.print(start);
 
   Serial.print("  Roll:");
