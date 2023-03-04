@@ -24,6 +24,8 @@
 //SOBRE O UNIVERSO DOS VANTS. CANAL: https://www.youtube.com/user/MacPuffdog/featured |
 //-------------------------------------------------------------------------------------
 
+#define LED 12
+
 #include <Wire.h>               //Biblioteca responsável pela comunicação I²C
 #include <EEPROM.h>             //Biblioteca resposável por armazenar informações na memória do Arduino
 
@@ -46,12 +48,12 @@ float giroscopio_roll_cal, giroscopio_pitch_cal, giroscopio_yaw_cal;
 //Rotina de Setup
 //--------------------------------------------------------------------------------------------------
 void setup(){
-  pinMode(12, OUTPUT);		// Pino 12 como output para a LED (O resto é input automaticamente)
+  pinMode(LED, OUTPUT);		// Pino 12 como output para a LED (O resto é input automaticamente)
   PCICR |= (1 << PCIE0);    // registrador PCIE0 em ALTO, para habilitar scaneamento do PCMSK0 (interrupção)
-  PCMSK0 |= (1 << PCINT0);  // PCINT0 em HIGH (GPIO 8) para acionar interrupção em qualquer mudança de nivel logico
-  PCMSK0 |= (1 << PCINT1);  // PCINT1 em HIGH (GPIO 9) para acionar interrupção em qualquer mudança de nivel logico
-  PCMSK0 |= (1 << PCINT2);  // PCINT2 em HIGH (GPIO 10) para acionar interrupção em qualquer mudança de nivel logico
-  PCMSK0 |= (1 << PCINT3);  // PCINT3 em HIGH (GPIO 11) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT0);  // PCINT1 em HIGH (GPIO 9) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT1);  // PCINT2 em HIGH (GPIO 10) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT2);  // PCINT3 em HIGH (GPIO 11) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT3);  // PCINT0 em HIGH (GPIO 8) para acionar interrupção em qualquer mudança de nivel logico
   Wire.begin();             // Inicia comunicação I²C como mestre
   Serial.begin(57600);      // Conexão serial com 57600 bps
   delay(250);               // Tempo extra pro giroscopio iniciar
@@ -92,11 +94,11 @@ void loop(){
     Serial.println(F("==================================================="));
     delay(1000);
     Serial.print(F("Checagem para sinais válidos"));
-    //Espera 10 segundos. Tempo limite para detectar sinais válidos do controle remoto (1000-2000us) de largura de pulso
-    wait_for_receiver();
+    //Espera 10 segundos. Tempo limite para detectar sinais válidos do controle remoto (1000-2000us) de largura de pulso\zzzzzz\z
+    espera_receptor();
     Serial.println(F(""));
   }
-  //Quit the program in case of an error
+  //Sai do programa caso dê erro
   if(error == 0){
     delay(2000);
     Serial.println(F("Coloque os manches na posição central do controle nos próximos 10 segundos"));
@@ -115,7 +117,7 @@ void loop(){
     Serial.println(F("Posições de CENTRO armazenadas"));
     Serial.print(F("GPIO 08 = "));
     Serial.println(receiver_input_channel_1);
-    Serial.print(F("GPIO 09 = "));
+    Serial.print(F("GPIO 9 = "));
     Serial.println(receiver_input_channel_2);
     Serial.print(F("GPIO 10 = "));
     Serial.println(receiver_input_channel_3);
@@ -174,7 +176,8 @@ void loop(){
     Serial.println(F(""));
     Serial.println(F("Mova lentamente os manches para cada extremidade"));
     Serial.println(F("Quando estiver pronto, coloque todos no centro novamente"));
-    //Register the min and max values of the receiver channels
+    
+	// Registra os valores mínimos e máximos do receptor
     register_min_max();
     Serial.println(F(""));
     Serial.println(F(""));
@@ -185,7 +188,7 @@ void loop(){
     Serial.print(center_channel_1);
     Serial.print(F(" - "));
     Serial.println(high_channel_1);
-    Serial.print(F("GPIO 09:"));
+    Serial.print(F("GPIO 9:"));
     Serial.print(low_channel_2);
     Serial.print(F(" - "));
     Serial.print(center_channel_2);
@@ -301,45 +304,45 @@ void loop(){
     Serial.println(F("Calibrando o giroscopio, isso demora +/- 8 seconds"));
     Serial.print(F("Por favor espera com o drone parado"));
     //Múltiplas medidas para identificar a média do erro de cada um dos eixos
-    for (cal_int = 0; cal_int < 2000 ; cal_int ++){              //Take 2000 readings for calibration.
-      if(cal_int % 100 == 0)Serial.print(F("."));                //Print dot to indicate calibration.
-      giroscopio_signalen();                                           //Read the giroscopio output.
-      giroscopio_roll_cal += giroscopio_roll;                                //Ad roll value to giroscopio_roll_cal.
-      giroscopio_pitch_cal += giroscopio_pitch;                              //Ad pitch value to giroscopio_pitch_cal.
-      giroscopio_yaw_cal += giroscopio_yaw;                                  //Ad yaw value to giroscopio_yaw_cal.
-      delay(4);                                                  //Wait 3 milliseconds before the next loop.
+    for (cal_int = 0; cal_int < 2000 ; cal_int ++){              //Pega 2000 medidas para a calibração (offset)
+      if(cal_int % 100 == 0)Serial.print(F("."));                //Printa pontos para indicar andamento da calibração
+      giroscopio_signalen();                                     //Faz leitura do giroscópio
+      giroscopio_roll_cal += giroscopio_roll;                    //Adiciona o valor a giroscopio_roll_cal.
+      giroscopio_pitch_cal += giroscopio_pitch;                  //Adiciona o valor a giroscopio_pitch_cal.
+      giroscopio_yaw_cal += giroscopio_yaw;                      //Adiciona o valor a giroscopio_yaw_cal.
+      delay(4);                                                  //Espera 3ms para o próximo loop
     }
-    //Now that we have 2000 measures, we need to devide by 2000 to get the average giroscopio offset.
-    giroscopio_roll_cal /= 2000;                                       //Divide the roll total by 2000.
-    giroscopio_pitch_cal /= 2000;                                      //Divide the pitch total by 2000.
-    giroscopio_yaw_cal /= 2000;                                        //Divide the yaw total by 2000.
+    //Média simples para cálculo do offset
+    giroscopio_roll_cal /= 2000;                                 //Divide the roll por 2000.
+    giroscopio_pitch_cal /= 2000;                                //Divide the pitch por 2000.
+    giroscopio_yaw_cal /= 2000;                                  //Divide the yaw por 2000.
     
-    //Show the calibration results
+    //Mostra o resultado
     Serial.println(F(""));
-    Serial.print(F("Axis 1 offset="));
+    Serial.print(F("Eixo 1 offset="));
     Serial.println(giroscopio_roll_cal);
-    Serial.print(F("Axis 2 offset="));
+    Serial.print(F("Eixo 2 offset="));
     Serial.println(giroscopio_pitch_cal);
-    Serial.print(F("Axis 3 offset="));
+    Serial.print(F("Eixo 3 offset="));
     Serial.println(giroscopio_yaw_cal);
     Serial.println(F(""));
     
     Serial.println(F("==================================================="));
-    Serial.println(F("giroscopio axes configuration"));
+    Serial.println(F("		Eixos de configuração do giroscopio"));
     Serial.println(F("==================================================="));
     
     //Detect the left wing up movement
-    Serial.println(F("Lift the left side of the quadcopter to a 45 degree angle within 10 seconds"));
+    Serial.println(F("Levante o lado esquerdo do drone a um ângulo de 45º (no máximo em 10 segundos)"));
     //Check axis movement
     check_giroscopio_axes(1);
     if(error == 0){
       Serial.println(F("OK!"));
-      Serial.print(F("Angle detection = "));
+      Serial.print(F("Detecção do ângulo = "));
       Serial.println(roll_axis & 0b00000011);
-      if(roll_axis & 0b10000000)Serial.println(F("Axis inverted = yes"));
-      else Serial.println(F("Axis inverted = no"));
-      Serial.println(F("Put the quadcopter back in its original position"));
-      Serial.println(F("Move stick 'nose up' and back to center to continue"));
+      if(roll_axis & 0b10000000)Serial.println(F("Eixo invertido = yes"));
+      else Serial.println(F("Eixo invertido = no"));
+      Serial.println(F("Coloque o drone na posição original"));
+      Serial.println(F("Com o controle, simule o comando que levante a frente do drone para cima. Depois para a posição original para continuar"));
       check_to_continue();
 
       //Detect the nose up movement
@@ -355,8 +358,8 @@ void loop(){
       Serial.println(pitch_axis & 0b00000011);
       if(pitch_axis & 0b10000000)Serial.println(F("Axis inverted = yes"));
       else Serial.println(F("Axis inverted = no"));
-      Serial.println(F("Put the quadcopter back in its original position"));
-      Serial.println(F("Move stick 'nose up' and back to center to continue"));
+      Serial.println(F("Coloque o drone na posição original"));
+      Serial.println(F("Com o controle, simule o comando que levante a frente do drone para cima. Depois para a posição original para continuar"));
       check_to_continue();
       
       //Detect the nose right movement
@@ -372,28 +375,28 @@ void loop(){
       Serial.println(yaw_axis & 0b00000011);
       if(yaw_axis & 0b10000000)Serial.println(F("Axis inverted = yes"));
       else Serial.println(F("Axis inverted = no"));
-      Serial.println(F("Put the quadcopter back in its original position"));
-      Serial.println(F("Move stick 'nose up' and back to center to continue"));
+      Serial.println(F("Coloque o drone na posição original"));
+      Serial.println(F("Com o controle, simule o comando que levante a frente do drone para cima. Depois para a posição original para continuar"));
       check_to_continue();
     }
   }
   if(error == 0){
     Serial.println(F(""));
     Serial.println(F("==================================================="));
-    Serial.println(F("LED test"));
+    Serial.println(F("Teste LED"));
     Serial.println(F("==================================================="));
-    digitalWrite(12, HIGH);
-    Serial.println(F("The LED should now be lit"));
-    Serial.println(F("Move stick 'nose up' and back to center to continue"));
+    digitalWrite(LED, HIGH);
+    Serial.println(F("A LES tem que estar ligada agora"));
+    Serial.println(F("Com o controle, simule o comando que levante a frente do drone para cima. Depois para a posição original para continuar"));
     check_to_continue();
-    digitalWrite(12, LOW);
+    digitalWrite(LED, LOW);
   }
   
   Serial.println(F(""));
   
   if(error == 0){
     Serial.println(F("==================================================="));
-    Serial.println(F("Final setup check"));
+    Serial.println(F("check-up final"));
     Serial.println(F("==================================================="));
     delay(1000);
     if(receiver_check_byte == 0b00001111){
@@ -455,14 +458,13 @@ void loop(){
     EEPROM.write(30, yaw_axis);
     EEPROM.write(31, type);
     EEPROM.write(32, giroscopio_address);
-    //Write the EEPROM signature
-    EEPROM.write(33, 'J'); 
-    EEPROM.write(34, 'M');
-    EEPROM.write(35, 'B');
+    //Escreve a assinatura "G0" nas posições 33,34 do EEPROM
+    EEPROM.write(33, 'G'); 
+    EEPROM.write(34, '0');
         
     
     //To make sure evrything is ok, verify the EEPROM data.
-    Serial.println(F("Verify EEPROM data"));
+    Serial.println(F("Verificação dos dados na EEPROM"));
     delay(1000);
     if(center_channel_1 != ((EEPROM.read(1) << 8) | EEPROM.read(0)))error = 1;
     if(center_channel_2 != ((EEPROM.read(3) << 8) | EEPROM.read(2)))error = 1;
@@ -490,9 +492,8 @@ void loop(){
     if(type != EEPROM.read(31))error = 1;
     if(giroscopio_address != EEPROM.read(32))error = 1;
     
-    if('J' != EEPROM.read(33))error = 1;
-    if('M' != EEPROM.read(34))error = 1;
-    if('B' != EEPROM.read(35))error = 1;
+    if('G' != EEPROM.read(33))error = 1;
+    if('0' != EEPROM.read(34))error = 1;
   
     if(error == 1)Serial.println(F("EEPROM verification failed!!! (ERROR 5)"));
     else Serial.println(F("Verification done"));
@@ -500,18 +501,18 @@ void loop(){
   
   
   if(error == 0){
-    Serial.println(F("Setup is finished."));
-    Serial.println(F("You can now calibrate the esc's and upload the YMFC-AL code."));
+    Serial.println(F("Configuração completa!"));
+    Serial.println(F("Agora você pode dar upload no programa GZ_calib_ESC_Arduino"));
   }
   else{
-   Serial.println(F("The setup is aborted due to an error."));
-   Serial.println(F("Check the Q and A page of the YMFC-AL project on:"));
-   Serial.println(F("www.brokking.net for more information about this error."));
+   Serial.println(F("DEU RUIM! Releia as instruções do código e tente novamente"));
+   Serial.println(F("Ou siga os mesmos passos feitos no seguinte vídeo:"));
+   Serial.println(F("youtube.com/@gravidadezero"));
   }
   while(1);
 }
 
-//Search for the giroscopio and check the Who_am_I register
+//Procura pelo giroscópio atravpes do registrador WHO_AM_I
 byte search_giroscopio(int giroscopio_address, int who_am_i){
   Wire.beginTransmission(giroscopio_address);
   Wire.write(who_am_i);
@@ -525,31 +526,31 @@ byte search_giroscopio(int giroscopio_address, int who_am_i){
 }
 
 void start_giroscopio(){
-  //Setup the L3G4200D or L3GD20H
+  //L3G4200D ou L3GD20H
   if(type == 2 || type == 3){
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio with the address encontrado during search
-    Wire.write(0x20);                                            //We want to write to register 1 (20 hex)
-    Wire.write(0x0F);                                            //Set the register bits as 00001111 (Turn on the giroscopio and enable all axis)
-    Wire.endTransmission();                                      //End the transmission with the giroscopio
+    Wire.beginTransmission(address);                             //Começa a comunicação com o giroscopio com o endereço encontrado na procura
+    Wire.write(0x20);                                            //Será registrado 1 (20 hex)
+    Wire.write(0x0F);                                            //Atribui os bits 00001111 (Liga o giroscópio e habilita todos os eixos)
+    Wire.endTransmission();                                      //Encerra a transmissão with the giroscopio
 
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio (adress 1101001)
-    Wire.write(0x20);                                            //Start reading @ register 28h and auto increment with every read
-    Wire.endTransmission();                                      //End the transmission
-    Wire.requestFrom(address, 1);                                //Request 6 bytes from the giroscopio
-    while(Wire.available() < 1);                                 //Wait until the 1 byte is received
+    Wire.beginTransmission(address);                             //Começa a comunicação com o giroscopio (adress 1101001)
+    Wire.write(0x20);                                            //Começa lendo o registrador 28h e incrementa o valor do endereço a cada leitura
+    Wire.endTransmission();                                      //Encerra a transmissão
+    Wire.requestFrom(address, 1);                                //Pede 6 bytes do giroscópio
+    while(Wire.available() < 1);                                 //Espera o primeiro byte ser recebido
     Serial.print(F("Register 0x20 is set to:"));
     Serial.println(Wire.read(),BIN);
 
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio  with the address encontrado during search
-    Wire.write(0x23);                                            //We want to write to register 4 (23 hex)
-    Wire.write(0x90);                                            //Set the register bits as 10010000 (Block Data Update active & 500dps full scale)
-    Wire.endTransmission();                                      //End the transmission with the giroscopio
+    Wire.beginTransmission(address);                             //Começa a comunicação com o giroscopio  com o endereço encontrado na procura
+    Wire.write(0x23);                                            //Será registrado 4 (23 hex)
+    Wire.write(0x90);                                            //Atribui os bits 10010000 (Block Data Update active & 500dps full scale)
+    Wire.endTransmission();                                      //Encerra a transmissão with the giroscopio
     
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio (adress 1101001)
-    Wire.write(0x23);                                            //Start reading @ register 28h and auto increment with every read
-    Wire.endTransmission();                                      //End the transmission
-    Wire.requestFrom(address, 1);                                //Request 6 bytes from the giroscopio
-    while(Wire.available() < 1);                                 //Wait until the 1 byte is received
+    Wire.beginTransmission(address);                             //Começa a comunicação com o giroscopio (adress 1101001)
+    Wire.write(0x23);                                            //Começa lendo o registrador 28h e incrementa o valor do endereço a cada leitura
+    Wire.endTransmission();                                      //Encerra a transmissão
+    Wire.requestFrom(address, 1);                                //Pede 6 bytes do giroscópio
+    while(Wire.available() < 1);                                 //Espera o primeiro byte ser recebido
     Serial.print(F("Register 0x23 is set to:"));
     Serial.println(Wire.read(),BIN);
 
@@ -557,29 +558,29 @@ void start_giroscopio(){
   //Setup the MPU-6050
   if(type == 1){
     
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio
+    Wire.beginTransmission(address);                             //Começa a comunicação com o giroscopio
     Wire.write(0x6B);                                            //PWR_MGMT_1 register
     Wire.write(0x00);                                            //Set to zero to turn on the giroscopio
-    Wire.endTransmission();                                      //End the transmission
+    Wire.endTransmission();                                      //Encerra a transmissão
     
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio
-    Wire.write(0x6B);                                            //Start reading @ register 28h and auto increment with every read
-    Wire.endTransmission();                                      //End the transmission
+    Wire.beginTransmission(address);                             //Começa a comunicação com o giroscopio
+    Wire.write(0x6B);                                            //Começa lendo o registrador 28h e incrementa o valor do endereço a cada leitura
+    Wire.endTransmission();                                      //Encerra a transmissão
     Wire.requestFrom(address, 1);                                //Request 1 bytes from the giroscopio
-    while(Wire.available() < 1);                                 //Wait until the 1 byte is received
+    while(Wire.available() < 1);                                 //Espera o primeiro byte ser recebido
     Serial.print(F("Register 0x6B is set to:"));
     Serial.println(Wire.read(),BIN);
     
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio
+    Wire.beginTransmission(address);                             //Começa a comunicação com o giroscopio
     Wire.write(0x1B);                                            //giroscopio_CONFIG register
-    Wire.write(0x08);                                            //Set the register bits as 00001000 (500dps full scale)
-    Wire.endTransmission();                                      //End the transmission
+    Wire.write(0x08);                                            //Atribui os bits 00001000 (500dps full scale)
+    Wire.endTransmission();                                      //Encerra a transmissão
     
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio (adress 1101001)
-    Wire.write(0x1B);                                            //Start reading @ register 28h and auto increment with every read
-    Wire.endTransmission();                                      //End the transmission
+    Wire.beginTransmission(address);                             //Começa a comunicação com o giroscopio (adress 1101001)
+    Wire.write(0x1B);                                            //Começa lendo o registrador 28h e incrementa o valor do endereço a cada leitura
+    Wire.endTransmission();                                      //Encerra a transmissão
     Wire.requestFrom(address, 1);                                //Request 1 bytes from the giroscopio
-    while(Wire.available() < 1);                                 //Wait until the 1 byte is received
+    while(Wire.available() < 1);                                 //Espera o primeiro byte ser recebido
     Serial.print(F("Register 0x1B is set to:"));
     Serial.println(Wire.read(),BIN);
 
@@ -588,36 +589,36 @@ void start_giroscopio(){
 
 void giroscopio_signalen(){
   if(type == 2 || type == 3){
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio
-    Wire.write(168);                                             //Start reading @ register 28h and auto increment with every read
-    Wire.endTransmission();                                      //End the transmission
-    Wire.requestFrom(address, 6);                                //Request 6 bytes from the giroscopio
-    while(Wire.available() < 6);                                 //Wait until the 6 bytes are received
-    lowByte = Wire.read();                                       //First received byte is the low part of the angular data
-    highByte = Wire.read();                                      //Second received byte is the high part of the angular data
-    giroscopio_roll = ((highByte<<8)|lowByte);                         //Multiply highByte by 256 (shift left by 8) and ad lowByte
-    if(cal_int == 2000)giroscopio_roll -= giroscopio_roll_cal;               //Only compensate after the calibration
-    lowByte = Wire.read();                                       //First received byte is the low part of the angular data
-    highByte = Wire.read();                                      //Second received byte is the high part of the angular data
-    giroscopio_pitch = ((highByte<<8)|lowByte);                        //Multiply highByte by 256 (shift left by 8) and ad lowByte
-    if(cal_int == 2000)giroscopio_pitch -= giroscopio_pitch_cal;             //Only compensate after the calibration
-    lowByte = Wire.read();                                       //First received byte is the low part of the angular data
-    highByte = Wire.read();                                      //Second received byte is the high part of the angular data
-    giroscopio_yaw = ((highByte<<8)|lowByte);                          //Multiply highByte by 256 (shift left by 8) and ad lowByte
-    if(cal_int == 2000)giroscopio_yaw -= giroscopio_yaw_cal;                 //Only compensate after the calibration
-  }
-  if(type == 1){
-    Wire.beginTransmission(address);                             //Start communication with the giroscopio
-    Wire.write(0x43);                                            //Start reading @ register 43h and auto increment with every read
-    Wire.endTransmission();                                      //End the transmission
-    Wire.requestFrom(address,6);                                 //Request 6 bytes from the giroscopio
-    while(Wire.available() < 6);                                 //Wait until the 6 bytes are received
-    giroscopio_roll=Wire.read()<<8|Wire.read();                        //Read high and low part of the angular data
-    if(cal_int == 2000)giroscopio_roll -= giroscopio_roll_cal;               //Only compensate after the calibration
-    giroscopio_pitch=Wire.read()<<8|Wire.read();                       //Read high and low part of the angular data
-    if(cal_int == 2000)giroscopio_pitch -= giroscopio_pitch_cal;             //Only compensate after the calibration
-    giroscopio_yaw=Wire.read()<<8|Wire.read();                         //Read high and low part of the angular data
-    if(cal_int == 2000)giroscopio_yaw -= giroscopio_yaw_cal;                 //Only compensate after the calibration
+    Wire.beginTransmission(address);                             // Começa a comunicação com o giroscopio
+    Wire.write(168);                                             // Começa lendo o registrador 28h e incrementa o valor do endereço a cada leitura
+    Wire.endTransmission();                                      // Encerra a transmissão
+    Wire.requestFrom(address, 6);                                // Pede 6 bytes do giroscópio
+    while(Wire.available() < 6);                                 // Wait until the 6 bytes are received
+    lowByte = Wire.read();                                       // First received byte is the low part of the angular data
+    highByte = Wire.read();                                      // Second received byte is the high part of the angular data
+    giroscopio_roll = ((highByte<<8)|lowByte);                   // Multiply highByte by 256 (shift left by 8) and ad lowByte
+    if(cal_int == 2000)giroscopio_roll -= giroscopio_roll_cal;   // Only compensate after the calibration
+    lowByte = Wire.read();                                       // First received byte is the low part of the angular data
+    highByte = Wire.read();                                      // Second received byte is the high part of the angular data
+    giroscopio_pitch = ((highByte<<8)|lowByte);                  // Multiply highByte by 256 (shift left by 8) and ad lowByte
+    if(cal_int == 2000)giroscopio_pitch -= giroscopio_pitch_cal; // Only compensate after the calibration
+    lowByte = Wire.read();                                       // First received byte is the low part of the angular data
+    highByte = Wire.read();                                      // Second received byte is the high part of the angular data
+    giroscopio_yaw = ((highByte<<8)|lowByte);                    // Multiply highByte by 256 (shift left by 8) and ad lowByte
+    if(cal_int == 2000)giroscopio_yaw -= giroscopio_yaw_cal;     // Only compensate after the calibration
+  }                                                                 
+  if(type == 1){                                                    
+    Wire.beginTransmission(address);                             // Começa a comunicação com o giroscopio
+    Wire.write(0x43);                                            // Começa lendo o registrador 43h e incrementa o valor do endereço a cada leitura
+    Wire.endTransmission();                                      // Encerra a transmissão
+    Wire.requestFrom(address,6);                                 // Pede 6 bytes do giroscópio
+    while(Wire.available() < 6);                                 // Wait until the 6 bytes are received
+    giroscopio_roll=Wire.read()<<8|Wire.read();                  // Read high and low part of the angular data
+    if(cal_int == 2000)giroscopio_roll -= giroscopio_roll_cal;   // Only compensate after the calibration
+    giroscopio_pitch=Wire.read()<<8|Wire.read();                 // Read high and low part of the angular data
+    if(cal_int == 2000)giroscopio_pitch -= giroscopio_pitch_cal; // Only compensate after the calibration
+    giroscopio_yaw=Wire.read()<<8|Wire.read();                   // Read high and low part of the angular data
+    if(cal_int == 2000)giroscopio_yaw -= giroscopio_yaw_cal;     // Only compensate after the calibration
   }
 }
 
@@ -654,7 +655,7 @@ void check_receiver_inputs(byte movement){
     Serial.println(F("Nenhum movimento detectado nos últimos 30 segundos :( (ERROR 2)"));
 	Serial.println(F("Verifique a conexão do recepetor nos GPIOs corretor e a bindagem com o RC"));
   }
-  //Assign the stick to the function.
+  //Atribui o manche à função
   else{
     if(movement == 1){
       channel_3_assign = trigger;		// Throttle
@@ -691,7 +692,7 @@ void check_to_continue(){
   wait_sticks_zero();
 }
 
-//Check if the transmitter sticks are in the neutral position
+// Checa se os transmissores estão na posição neutra
 void wait_sticks_zero(){
   byte zero = 0;
   while(zero < 15){
@@ -703,8 +704,8 @@ void wait_sticks_zero(){
   }
 }
 
-//Checck if the receiver values are valid within 10 seconds
-void wait_for_receiver(){
+// Checa se os valores do receptor estão válidos. Máximo 10 segundos
+void espera_receptor(){
   byte zero = 0;
   timer = millis() + 10000;
   while(timer > millis() && zero < 15){
@@ -723,7 +724,7 @@ void wait_for_receiver(){
   else Serial.println(F(" OK"));
 }
 
-//Register the min and max receiver values and exit when the sticks are back in the neutral position
+// Registra os valores máximos e mínimos, até que todos estejam na posição neutra
 void register_min_max(){
   byte zero = 0;
   low_channel_1 = receiver_input_channel_1;
@@ -731,13 +732,14 @@ void register_min_max(){
   low_channel_3 = receiver_input_channel_3;
   low_channel_4 = receiver_input_channel_4;
   while(receiver_input_channel_1 < center_channel_1 + 20 && receiver_input_channel_1 > center_channel_1 - 20)delay(250);
-  Serial.println(F("Measuring endpoints...."));
-  while(zero < 15){
-    if(receiver_input_channel_1 < center_channel_1 + 20 && receiver_input_channel_1 > center_channel_1 - 20)zero |= 0b00000001;
-    if(receiver_input_channel_2 < center_channel_2 + 20 && receiver_input_channel_2 > center_channel_2 - 20)zero |= 0b00000010;
-    if(receiver_input_channel_3 < center_channel_3 + 20 && receiver_input_channel_3 > center_channel_3 - 20)zero |= 0b00000100;
-    if(receiver_input_channel_4 < center_channel_4 + 20 && receiver_input_channel_4 > center_channel_4 - 20)zero |= 0b00001000;
-    if(receiver_input_channel_1 < low_channel_1)low_channel_1 = receiver_input_channel_1;
+  Serial.println(F(" Medindo as posições máximas e mínimas"));
+  while( // Enquanto os manches não estiverem na posição neutra
+	(receiver_input_channel_1 < center_channel_1 - 20 || receiver_input_channel_1 > center_channel_1 + 20) ||
+    (receiver_input_channel_2 < center_channel_2 - 20 || receiver_input_channel_2 > center_channel_2 + 20) ||
+    (receiver_input_channel_3 < center_channel_3 - 20 || receiver_input_channel_3 > center_channel_3 + 20) ||
+	(receiver_input_channel_4 < center_channel_4 - 20 || receiver_input_channel_4 > center_channel_4 + 20) ){
+    
+	if(receiver_input_channel_1 < low_channel_1)low_channel_1 = receiver_input_channel_1;
     if(receiver_input_channel_2 < low_channel_2)low_channel_2 = receiver_input_channel_2;
     if(receiver_input_channel_3 < low_channel_3)low_channel_3 = receiver_input_channel_3;
     if(receiver_input_channel_4 < low_channel_4)low_channel_4 = receiver_input_channel_4;
@@ -745,22 +747,29 @@ void register_min_max(){
     if(receiver_input_channel_2 > high_channel_2)high_channel_2 = receiver_input_channel_2;
     if(receiver_input_channel_3 > high_channel_3)high_channel_3 = receiver_input_channel_3;
     if(receiver_input_channel_4 > high_channel_4)high_channel_4 = receiver_input_channel_4;
+	
+	Serial.print(F("Posição mínima e máxima respectiva |Canal 1: "));
+	Serial.print((low_channel_1));Serial.print(F(" - "));Serial.print((high_channel_1));Serial.print(F(" |Canal 2: "));
+	Serial.print((low_channel_2));Serial.print(F(" - "));Serial.print((high_channel_2));Serial.print(F(" |Canal 3: "));
+	Serial.print((low_channel_3));Serial.print(F(" - "));Serial.print((high_channel_3));Serial.print(F(" |Canal 4: "));
+	Serial.print((low_channel_4));Serial.print(F(" - "));Serial.println((high_channel_4));
     delay(100);
-  }
+	}
 }
 
-//Check if the angular position of a giroscopio axis is changing within 10 seconds
+//Checa se as movimento dos giroscópios. (Max. 10 segundos)
 void check_giroscopio_axes(byte movement){
   byte trigger_axis = 0;
   float giroscopio_angle_roll, giroscopio_angle_pitch, giroscopio_angle_yaw;
-  //Reset all axes
+  //Reseta os eixos
   giroscopio_angle_roll = 0;
   giroscopio_angle_pitch = 0;
   giroscopio_angle_yaw = 0;
   giroscopio_signalen();
   timer = millis() + 10000;    
   while(timer > millis() && giroscopio_angle_roll > -30 && giroscopio_angle_roll < 30 && giroscopio_angle_pitch > -30 && giroscopio_angle_pitch < 30 && giroscopio_angle_yaw > -30 && giroscopio_angle_yaw < 30){
-    giroscopio_signalen();
+    // Adquire valores brutos (palavra digital) do giroscópio e converte para ângulo a partir da resolução do tipo da IMU
+	giroscopio_signalen();
     if(type == 2 || type == 3){
       giroscopio_angle_roll += giroscopio_roll * 0.00007;              //0.00007 = 17.5 (md/s) / 250(Hz)
       giroscopio_angle_pitch += giroscopio_pitch * 0.00007;
@@ -772,9 +781,9 @@ void check_giroscopio_axes(byte movement){
       giroscopio_angle_yaw += giroscopio_yaw * 0.0000611;
     }
     
-    delayMicroseconds(3700); //Loop is running @ 250Hz. +/-300us is used for communication with the giroscopio
+    delayMicroseconds(3700); //Loop is running @ 250Hz. +/-300us is used for communication with the giroscopio. (Precisamos manter )
   }
-  //Assign the moved axis to the orresponding function (pitch, roll, yaw)
+  // Atribui o eixo ao movimento de Roll Pitch e Yaw do drone
   if((giroscopio_angle_roll < -30 || giroscopio_angle_roll > 30) && giroscopio_angle_pitch > -30 && giroscopio_angle_pitch < 30 && giroscopio_angle_yaw > -30 && giroscopio_angle_yaw < 30){
     giroscopio_check_byte |= 0b00000001;
     if(giroscopio_angle_roll < 0)trigger_axis = 0b10000001;
@@ -803,19 +812,19 @@ void check_giroscopio_axes(byte movement){
   
 }
 
-//Toda vez que houver uma mudança nos pinos 8,9, 10 ou 11 o programa interrompe e executa isso:
+//Toda vez que houver uma mudança nos pinos 8, 9, 10 ou 11 o programa interrompe e executa isso:
 ISR(PCINT0_vect){
   current_time = micros();
   //Channel 1=========================================
-  if(PINB & B00000001){                                        //Caso a entrada 8 esteja em alto
-    if(antigo_canal_1 == 0){                                   //Entrada 8 estava baixo, foi pra alto
-      antigo_canal_1 = 1;                                      //Remember current input state
-      timer_1 = current_time;                                  //Set timer_1 to current_time
+  if(PINB & B00000001){                                        //Is input 8 high?
+    if(antigo_canal_1 == 0){                                   //Input 8 changed from 0 to 1.
+      antigo_canal_1 = 1;                                      //Remember current input state.
+      timer_1 = current_time;                                  //Set timer_1 to current_time.
     }
   }
-  else if(antigo_canal_1 == 1){                                //Entrada 8 estava alto, foi pra baixo
-    antigo_canal_1 = 0;                                        //Remember current input state
-    receiver_input_channel_1 = current_time - timer_1;         //Channel 1 is current_time - timer_1
+  else if(antigo_canal_1 == 1){                                //Input 8 is not high and changed from 1 to 0.
+    antigo_canal_1 = 0;                                        //Remember current input state.
+    receiver_input_channel_1 = current_time - timer_1;                 //Channel 1 is current_time - timer_1.
   }
   //Channel 2=========================================
   if(PINB & B00000010 ){                                       //Caso a entrada 9 esteja em alto

@@ -33,6 +33,7 @@
       //5 = Checar vibração de todos os motores simultaneamente         |
       //=================================================================
 
+#define LED 12
 
 #include <Wire.h>                                    //Biblioteca para comunicação i²C com a IMU
 #include <EEPROM.h>                                  //Comunicação com a memória EEPROM do Arduino
@@ -64,8 +65,8 @@ void setup(){
   TWBR = 12;                                                                            //Clock i²c 400KHz (máximo IMU e ADS)
 
   //Portas de saída do arduino
-  DDRD |= B11110000;                                                                    //Portas 4, 5, 6 e 7 (sinal para os escs)
-  DDRB |= B00010000;                                                                    //Porta 12, LED
+  DDRD |= B11110000;                                                                    // Portas 4, 5, 6 e 7 (sinal para os escs)
+  DDRB |= B00010000;                                                                    // e Porta 12, LED
 
   PCICR |= (1 << PCIE0);                                                                // Registrador PCIE0  em alto para habilitar scaneamento de interrupção do PCMSK0.
   PCMSK0 |= (1 << PCINT0);                                                              // Registrador PCINT0 em alto para habilitar interrupão nos pino 8  em qualquer mudança
@@ -80,9 +81,9 @@ void setup(){
   set_gyro_registers();                                                                 //Configuração de escalas e resoluções da IMU
 
   //Assinatura na memória EEPROM de JOOP Brookling (programa original)
-  while(eeprom_data[33] != 'J' || eeprom_data[34] != 'M' || eeprom_data[35] != 'B'){
+  while(eeprom_data[33] != 'G' || eeprom_data[34] != '0'){
     delay(500);                                                                         //Espera 0.5 segundos
-    digitalWrite(12, !digitalRead(12));                                                 //Se não houver a assinatura liga o led pra indicar erro
+    digitalWrite(LED, !digitalRead(LED));                                                 //Se não houver a assinatura liga o led pra indicar erro
   }
   wait_for_receiver();                                                                  //Espera valores válidos do receptor
   Serial.println("              Lista de comandos            ");
@@ -249,7 +250,7 @@ void loop(){
       //Let's take multiple gyro data samples so we can determine the average gyro offset (calibration).
       for (cal_int = 0; cal_int < 2000 ; cal_int ++){                                   //Take 2000 readings for calibration.
         if(cal_int % 125 == 0){
-          digitalWrite(12, !digitalRead(12));   //Change the led status to indicate calibration.
+          digitalWrite(LED, !digitalRead(LED));   //Change the led status to indicate calibration.
           Serial.print(".");
         }
         gyro_signalen();                                                                //Read the gyro output.
@@ -257,10 +258,10 @@ void loop(){
         gyro_axis_cal[2] += gyro_axis[2];                                               //Ad pitch value to gyro_pitch_cal.
         gyro_axis_cal[3] += gyro_axis[3];                                               //Ad yaw value to gyro_yaw_cal.
         //We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while calibrating the gyro.
-        PORTD |= B11110000;                                                             //Set digital poort 4, 5, 6 and 7 high.
-        delayMicroseconds(1500);                                                        //Wait 1000us.
-        PORTD &= B00001111;                                                             //Set digital poort 4, 5, 6 and 7 low.
-        delay(3);                                                                       //Wait 3 milliseconds before the next loop.
+        PORTD |= B11110000;                                                             // Set digital port 4, 5, 6 and 7 high.
+        delayMicroseconds(1500);                                                        // Espera 1500us.
+        PORTD &= B00001111;                                                             //Set digital port 4, 5, 6 and 7 low.
+        delayMicroseconds(2500);                                                        // Espera 2500us
       }
       Serial.println(".");
       //Now that we have 2000 measures, we need to devide by 2000 to get the average gyro offset.
@@ -270,9 +271,10 @@ void loop(){
     }
     else{
       ///We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while calibrating the gyro.
-      PORTD |= B11110000;                                                               //Set digital poort 4, 5, 6 and 7 high.
-      delayMicroseconds(1500);                                                          //Wait 1000us.
-      PORTD &= B00001111;                                                               //Set digital poort 4, 5, 6 and 7 low.
+        PORTD |= B11110000;                                                             // Set digital port 4, 5, 6 and 7 high.
+        delayMicroseconds(1500);                                                        // Espera 1500us.
+        PORTD &= B00001111;                                                             //Set digital port 4, 5, 6 and 7 low.
+        delayMicroseconds(2500);                                                        // Espera 2500us
 
       //Let's get the current gyro data.
       gyro_signalen();
@@ -402,7 +404,7 @@ int convert_receiver_channel(byte function){
     if(reverse == 1)return 1750 + difference;                                  //If the channel is reversed
     else return 1750 - difference;                                             //If the channel is not reversed
   }
-  else if(actual > center){                                                                        //The actual receiver value is higher than the center value
+  else if(actual > center){                                                    //The actual receiver value is higher than the center value
     if(actual > high)actual = high;                                            //Limit the lowest value to the value that was detected during setup
     difference = ((long)(actual - center) * (long)250) / (high - center);      //Calculate and scale the actual value to a 1000 - 2000us value
     if(reverse == 1)return 1750 - difference;                                  //If the channel is reversed
@@ -442,18 +444,18 @@ void print_signals(){
 
 void esc_pulse_output(){
   zero_timer = micros();
-  PORTD |= B11110000;                                            //Set port 4, 5, 6 and 7 high at once
-  timer_channel_1 = esc_1 + zero_timer;                          //Calculate the time when digital port 4 is set low.
-  timer_channel_2 = esc_2 + zero_timer;                          //Calculate the time when digital port 5 is set low.
-  timer_channel_3 = esc_3 + zero_timer;                          //Calculate the time when digital port 6 is set low.
-  timer_channel_4 = esc_4 + zero_timer;                          //Calculate the time when digital port 7 is set low.
+  PORTD |= B11110000;                                            // Coloca as portas 4, 5, 6 e 7 em ALTO, simultaneamente
+  timer_channel_1 = esc_1 + zero_timer;                          // Calcula o tempo em que a porta 4 is foi colocada em BAIXO.
+  timer_channel_2 = esc_2 + zero_timer;                          // Calcula o tempo em que a porta 5 is foi colocada em BAIXO.
+  timer_channel_3 = esc_3 + zero_timer;                          // Calcula o tempo em que a porta 6 is foi colocada em BAIXO.
+  timer_channel_4 = esc_4 + zero_timer;                          // Calcula o tempo em que a porta 7 is foi colocada em BAIXO.
 
-  while(PORTD >= 16){                                            //Execute the loop until digital port 4 to 7 is low.
-    esc_loop_timer = micros();                                   //Check the current time.
-    if(timer_channel_1 <= esc_loop_timer)PORTD &= B11101111;     //When the delay time is expired, digital port 4 is set low.
-    if(timer_channel_2 <= esc_loop_timer)PORTD &= B11011111;     //When the delay time is expired, digital port 5 is set low.
-    if(timer_channel_3 <= esc_loop_timer)PORTD &= B10111111;     //When the delay time is expired, digital port 6 is set low.
-    if(timer_channel_4 <= esc_loop_timer)PORTD &= B01111111;     //When the delay time is expired, digital port 7 is set low.
+  while(PORTD >= 16){                                            // Loop, até que as portas de  4 to 7 estejam em baixas.
+    esc_loop_timer = micros();                                   // Checa o estado atual
+    if(timer_channel_1 <= esc_loop_timer)PORTD &= B11101111;     // Quando o delay acabar, a porta digital 4 is foi colocada em BAIXO.
+    if(timer_channel_2 <= esc_loop_timer)PORTD &= B11011111;     // Quando o delay acabar, a porta digital 5 is foi colocada em BAIXO.
+    if(timer_channel_3 <= esc_loop_timer)PORTD &= B10111111;     // Quando o delay acabar, a porta digital 6 is foi colocada em BAIXO.
+    if(timer_channel_4 <= esc_loop_timer)PORTD &= B01111111;     // Quando o delay acabar, a porta digital 7 is foi colocada em BAIXO.
   }
 }
 
@@ -482,7 +484,7 @@ void set_gyro_registers(){
     Wire.requestFrom(gyro_address, 1);                           //Request 1 bytes from the gyro
     while(Wire.available() < 1);                                 //Wait until the 6 bytes are received
     if(Wire.read() != 0x08){                                     //Check if the value is 0x08
-      digitalWrite(12,HIGH);                                     //Turn on the warning led
+      digitalWrite(LED,HIGH);                                     //Turn on the warning led
       while(1)delay(10);                                         //Stay in this loop for ever
     }
 

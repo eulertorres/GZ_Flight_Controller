@@ -43,7 +43,7 @@ float pid_i_gain_yaw = 0.02;				// Ganho da parte I (Integrador) do Pitch
 float pid_d_gain_yaw = 0;					// Ganho da parte D (Derivativo) do Pitch
 int pid_max_yaw = 200;						// Saída máxima e mínima do PID para o pitch
 											   
-boolean auto_level = true;					// Balanceamento automático |||CUIDADO AO DESATIVAR|||
+boolean auto_level = true;					// Balanceamento automático |||CUIDADO AO DESATIVAR ISSO!!!!||| VOCÊ PRECISA SER PILOTO LEVEL 87 PARA DESATIVAR ISSO
 
 // Variáveis globais
 //--------------------------------------------------------------------------------------------------------------------
@@ -62,7 +62,7 @@ int acc_axis[4], gyro_axis[4];											// Buffer de dados acelerômetro e giro
 float roll_level_adjust, pitch_level_adjust;							// Ajuste fino do Roll e Pitch
 
 long acc_x, acc_y, acc_z, acc_total_vector;								// Vetor da aceleração resultante (Trigonometria)
-unsigned long timer_channel_1, timer_channel_2, timer_channel_3, timer_channel_4, esc_timer, esc_loop_timer;			// Controle largura de pulso
+unsigned long timer_channel_1, timer_channel_2, timer_channel_3, timer_channel_4, esc_loop_timer;			// Controle largura de pulso
 unsigned long timer_1, timer_2, timer_3, timer_4, current_time;			// Controle largura de pulso
 unsigned long loop_timer;
 double gyro_pitch, gyro_roll, gyro_yaw;									// Vetores de velocidade angular giroscópio
@@ -86,20 +86,23 @@ void setup(){
 																			   
   Wire.begin();                                                             // Comunicação I²C como Mestre
   TWBR = 12;                                                                // registrador do clock I²C como 400Khz
+  
+  // Configuração das portas de saída do arduino, o restante é entrada
   DDRD |= B11110000;                                                        // Portas 4, 5, 6 e 7 do arduino como saídas
   DDRB |= B00110000;                                                        // Portas 12 e 13 do arduino como saídas
 																			   
-  //LED para indicar inincio da configuração                                   
+  // LED para indicar inincio da configuração                                   
   digitalWrite(12,HIGH);                                                    // Liga a led
 
-  //Verificação de assinatura de Joop Brooking na memória EEPROM [Verifica se o Setup foi feito de maneiro correta]
-  while(eeprom_data[33] != 'J' || eeprom_data[34] != 'M' || eeprom_data[35] != 'B')delay(10);
+  // Verificação de assinatura de Joop Brooking na memória EEPROM [Verifica se o Setup foi feito de maneiro correta]
+  while(eeprom_data[33] != 'G' || eeprom_data[34] != '0')delay(10);
 
-  //Caso o drone não tenha IMU, interrompe o programa
+  // Caso o drone não tenha IMU, interrompe o programa
   if(eeprom_data[31] == 2 || eeprom_data[31] == 3)delay(10);
 
   set_gyro_registers();                                                     // Checagem e configuração dos registradores da IMU
-																			   
+
+  //  Manda sinais para o motor ficar parado.
   for (cal_int = 0; cal_int < 1250 ; cal_int ++){                           // Espera 5 segundos antes de continuar (tenpo te rotina )
     PORTD |= B11110000;                                                     // Porta 4, 5, 6 e 7 em nivel ALTO
     delayMicroseconds(1500);                                                // Espera 1.5 milisegundos (1500us).
@@ -114,17 +117,18 @@ void setup(){
     gyro_axis_cal[1] += gyro_axis[1];                                       // Acumula o resultado do 1 byte (roll)
     gyro_axis_cal[2] += gyro_axis[2];                                       // Acumula o resultado do 2 byte (pitch)
     gyro_axis_cal[3] += gyro_axis[3];                                       // Acumula o resultado do 3 byte (yaw)
-    //Envia pulsos de 1500 us para parar o motor [APENAS EM ESCs BIDIRECIONAIS ----CUIDADO-------]
+    // Envia pulsos de 1500 us para parar o motor [APENAS EM ESCs BIDIRECIONAIS ----CUIDADO-------]
     PORTD |= B11110000;                                                     // Porta 4, 5, 6 e 7 em nivel ALTO
     delayMicroseconds(1500);                                                // Espera 1.5 milisegundos (1500us). (Desliga o motor)
     PORTD &= B00001111;                                                     // Porta 4, 5, 6 e 7 nivel BAIXO
     delayMicroseconds(2500);                                                // Espera 2.5 ms [completa o período de 4 ms]
   }
-  //Adquirimos a média simples das 2000 amostras para estimar o erro do giroscópio
+  // Adquirimos a média simples das 2000 amostras para estimar o erro do giroscópio
   gyro_axis_cal[1] /= 2000;                                                 // Divide o roll  por 2000
   gyro_axis_cal[3] /= 2000;                                                 // Divide o yaw   por 2000
   gyro_axis_cal[2] /= 2000;                                                 // Divide o pitch por 2000
-																			   
+
+  // Depois da calibração da IMU, habilitar a interrupção do micro
   PCICR |= (1 << PCIE0);                                                    // Registeador PCIE0  em alto para habilitar scaneamento da interrupção através do PCMSK0
   PCMSK0 |= (1 << PCINT0);                                                  // Registrador PCINT0 em alto (entrada digital 8)  para causar uma interrupção em qualquer mudança.
   PCMSK0 |= (1 << PCINT1);                                                  // Registrador PCINT1 em alto (entrada digital 9)  para causar uma interrupção em qualquer mudança.
@@ -149,12 +153,12 @@ void setup(){
   start = 0;                                                                // Reseta a variável
 
   //Cálculo da tensão atual da bateria 4S (importante) [Divisor de tensão R1 = 5.1K e R2 = 1K]
-  //O diodo apresenta queda de tensão equivalente de 0.7V [65 (decimal)]
+  //O diodo apresenta queda de tensão equivalente de 0.8V [49 (decimal)]
   //A bateria cheia (16,8V) deve mostrar na porta analógica 5V (valor máximo da porta analógica do Arduino)
   //16,8V deve ser lido como 1023 na porta analógica A0
   //16,8 / 1023 = 0,01642V/b. Cada valor incrementado [em bits] representa 0,016422 V da bateria (Resolução)
   //Exemplo: Caso seja lido 787 na porta A0, o valor de tensão da bateria será 12.92 V
-  battery_voltage = (analogRead(0) + 43) * 0.01642;
+  battery_voltage = (analogRead(0) + 49) * 0.01642;
 
   digitalWrite(12,LOW);                                                     //Desliga a LED
   loop_timer = micros();													//Set the timer for the next loop.
@@ -191,9 +195,9 @@ void loop(){
     angle_roll_acc = asin((float)acc_x/acc_total_vector)* -57.296;          // Ângulo do roll baseado na aceleração
   }
   
-  //Place the MPU-6050 spirit level and note the values in the following two lines for calibration.
-  angle_pitch_acc -= 0.0;                                                   // Accelerometer calibration value for pitch.
-  angle_roll_acc -= 0.0;                                                    // Accelerometer calibration value for roll.
+  // Valores para calibração manual do acelerômetro
+  angle_pitch_acc -= 0.0;                                                   // Valor do acelerometro para o pitch.
+  angle_roll_acc -= 0.0;                                                    // Valor do acelerometro para o roll.
 																			   
   angle_pitch = angle_pitch * 0.9996 + angle_pitch_acc * 0.0004;            // Filtro complementar para correção do acumulo de erro no pitch
   angle_roll = angle_roll * 0.9996 + angle_roll_acc * 0.0004;               // Filtro complementar para correção do acumulo de erro no roll
@@ -215,9 +219,8 @@ void loop(){
 
     angle_pitch = angle_pitch_acc;                                          // Ângulo inicial do pitch será do acelerômetro (gravidade como referência)
     angle_roll = angle_roll_acc;                                            // Ângulo inicial do roll  será do acelerômetro (gravidade como referência)
-    gyro_angles_set = true;                                                 // Flag para indicar inicio da IMU
 
-    //Reset the PID controllers for a bumpless start.
+    //Reseta os dados do sistema PID, para uma decolagem suave. (Apaga a memória do último voo)
     pid_i_mem_roll = 0;
     pid_last_roll_d_error = 0;
     pid_i_mem_pitch = 0;
@@ -256,8 +259,8 @@ void loop(){
   calculate_pid();                                                            // Com as entradas prontas para os PIDs, podemos calcular a saída
 
   //Compesação do descarga da bateria no contolador PID (com filtro complementar para reudizr o ruído da leitura analógica)
-  //0.09853 = 0.08 * 1.2317.
-  battery_voltage = battery_voltage * 0.92 + (analogRead(0) + 65) * 0.09853;
+	//0.09853 = 0.08 * 0.01642.
+	battery_voltage = battery_voltage * 0.92 + (analogRead(0) + 49) * 0.0013136;
   if(battery_voltage < 14 && battery_voltage > 12.8)digitalWrite(12, HIGH);// Aviso caso o nivel da bateria esteja muito baixo (12.8 a  14V)
 
   throttle = receiver_input_channel_3;                                      // O throttle será o sinal de controle principal
@@ -402,20 +405,22 @@ void gyro_signalen(){
     gyro_axis[1] -= gyro_axis_cal[1];                                       // Apenas compensa se tiver calibrado
     gyro_axis[2] -= gyro_axis_cal[2];                                       // Apenas compensa se tiver calibrado
     gyro_axis[3] -= gyro_axis_cal[3];                                       // Apenas compensa se tiver calibrado
-  }                                                                            
+  }
+
+  // Atribui o valor adquirido de cada eixo da IMU para o respectivo movimento do drone adquirido na configuração
   gyro_roll = gyro_axis[eeprom_data[28] & 0b00000011];                      // Atribui a variável gyro_roll para o eixo que foi detectado na configuração inicial (primeiro código). [EEPROM]
-  if(eeprom_data[28] & 0b10000000)gyro_roll *= -1;                          // Invert gyro_roll if the MSB of EEPROM bit 28 is set.
+  if(eeprom_data[28] & 0b10000000)gyro_roll *= -1;                          // Inverte gyro_roll se o bit mais significativo ( 28 ) for '1'
   gyro_pitch = gyro_axis[eeprom_data[29] & 0b00000011];                     // Atribui a variável gyro_pitch para o eixo que foi detectado na configuração inicial (primeiro código). [EEPROM]
-  if(eeprom_data[29] & 0b10000000)gyro_pitch *= -1;                         // Invert gyro_pitch if the MSB of EEPROM bit 29 is set.
+  if(eeprom_data[29] & 0b10000000)gyro_pitch *= -1;                         // Inverte gyro_pitch se o bit mais significativo ( 29 ) for '1'
   gyro_yaw = gyro_axis[eeprom_data[30] & 0b00000011];                       // Atribui a variável gyro_yaw para o eixo que foi detectado na configuração inicial (primeiro código). [EEPROM]
-  if(eeprom_data[30] & 0b10000000)gyro_yaw *= -1;                           // Invert gyro_yaw if the MSB of EEPROM bit 30 is set.
+  if(eeprom_data[30] & 0b10000000)gyro_yaw *= -1;                           // Inverte gyro_yaw se o bit mais significativo ( 30 ) for '1'
 																			   
   acc_x = acc_axis[eeprom_data[29] & 0b00000011];                           // Set acc_x para o eixo que foi detectado na configuração inicial (primeiro código). [EEPROM]
-  if(eeprom_data[29] & 0b10000000)acc_x *= -1;                              // Invert acc_x if the MSB of EEPROM bit 29 is set.
+  if(eeprom_data[29] & 0b10000000)acc_x *= -1;                              // Inverte acc_x se o bit mais significativo ( 29 ) for '1'
   acc_y = acc_axis[eeprom_data[28] & 0b00000011];                           // Set acc_y para o eixo que foi detectado na configuração inicial (primeiro código). [EEPROM]
-  if(eeprom_data[28] & 0b10000000)acc_y *= -1;                              // Invert acc_y if the MSB of EEPROM bit 28 is set.
+  if(eeprom_data[28] & 0b10000000)acc_y *= -1;                              // Inverte acc_y se o bit mais significativo ( 28 ) for '1'
   acc_z = acc_axis[eeprom_data[30] & 0b00000011];                           // Set acc_z para o eixo que foi detectado na configuração inicial (primeiro código). [EEPROM]
-  if(eeprom_data[30] & 0b10000000)acc_z *= -1;                              // Invert acc_z if the MSB of EEPROM bit 30 is set.
+  if(eeprom_data[30] & 0b10000000)acc_z *= -1;                              // Inverte acc_z se o bit mais significativo ( 30 ) for '1'
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
@@ -447,13 +452,13 @@ void calculate_pid(){
   else if(pid_output_pitch < pid_max_pitch * -1)pid_output_pitch = pid_max_pitch * -1;  // + 200 ou -200
   pid_last_pitch_d_error = pid_error_temp;                                              // Salva o erro para o prox cálculo
   
-  //Cálculo PID Pitch -------------------------------------------------------------------------------------------------------------------------
+  //Cálculo PID Yaw -------------------------------------------------------------------------------------------------------------------------
   pid_error_temp = gyro_yaw_input - pid_yaw_setpoint;								// Cálculo do erro do ângulo roll
   pid_i_mem_yaw += pid_i_gain_yaw * pid_error_temp;                             	// Ganho controlador I multiplicado pelo erro
   if(pid_i_mem_yaw > pid_max_yaw)pid_i_mem_yaw = pid_max_yaw;                   	// Delimita esse valor para ficar entre +/- o valor máximo
   else if(pid_i_mem_yaw < pid_max_yaw * -1)pid_i_mem_yaw = pid_max_yaw * -1;
   
-// PID PITCH: ------|		Ganho_P * Erro [P]	      |Ganho_I*Erro [I]| 		Ganho_D * (Erro[i]-Erro[i-1]) [D]                  |-----------
+// PID Yaw: ------|		Ganho_P * Erro [P]	      |Ganho_I*Erro [I]| 		Ganho_D * (Erro[i]-Erro[i-1]) [D]                  |-----------
   pid_output_yaw = pid_p_gain_yaw * pid_error_temp + pid_i_mem_yaw + pid_d_gain_yaw * (pid_error_temp - pid_last_yaw_d_error);
   if(pid_output_yaw > pid_max_yaw)pid_output_yaw = pid_max_yaw;						        // Delimita esse valor para ficar entre +/- o valor máximo
   else if(pid_output_yaw < pid_max_yaw * -1)pid_output_yaw = pid_max_yaw * -1;    // + 200 ou -200
