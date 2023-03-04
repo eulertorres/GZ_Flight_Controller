@@ -24,7 +24,7 @@
 //SOBRE O UNIVERSO DOS VANTS. CANAL: https://www.youtube.com/user/MacPuffdog/featured |
 //-------------------------------------------------------------------------------------
 
-#define LED 12
+#define LED_R 2
 
 #include <Wire.h>               //Biblioteca responsável pela comunicação I²C
 #include <EEPROM.h>             //Biblioteca resposável por armazenar informações na memória do Arduino
@@ -48,12 +48,12 @@ float giroscopio_roll_cal, giroscopio_pitch_cal, giroscopio_yaw_cal;
 //Rotina de Setup
 //--------------------------------------------------------------------------------------------------
 void setup(){
-  pinMode(LED, OUTPUT);		// Pino 12 como output para a LED (O resto é input automaticamente)
+  pinMode(LED_R, OUTPUT);		// Pino 12 como output para a LED (O resto é input automaticamente)
   PCICR |= (1 << PCIE0);    // registrador PCIE0 em ALTO, para habilitar scaneamento do PCMSK0 (interrupção)
-  PCMSK0 |= (1 << PCINT0);  // PCINT1 em HIGH (GPIO 9) para acionar interrupção em qualquer mudança de nivel logico
-  PCMSK0 |= (1 << PCINT1);  // PCINT2 em HIGH (GPIO 10) para acionar interrupção em qualquer mudança de nivel logico
-  PCMSK0 |= (1 << PCINT2);  // PCINT3 em HIGH (GPIO 11) para acionar interrupção em qualquer mudança de nivel logico
-  PCMSK0 |= (1 << PCINT3);  // PCINT0 em HIGH (GPIO 8) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT1);  // PCINT1 em HIGH (GPIO 9) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT2);  // PCINT2 em HIGH (GPIO 10) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT3);  // PCINT3 em HIGH (GPIO 11) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT4);  // PCINT0 em HIGH (GPIO 8) para acionar interrupção em qualquer mudança de nivel logico
   Wire.begin();             // Inicia comunicação I²C como mestre
   Serial.begin(57600);      // Conexão serial com 57600 bps
   delay(250);               // Tempo extra pro giroscopio iniciar
@@ -115,13 +115,13 @@ void loop(){
     center_channel_4 = receiver_input_channel_4;
     Serial.println(F(""));
     Serial.println(F("Posições de CENTRO armazenadas"));
-    Serial.print(F("GPIO 08 = "));
+    Serial.print(F("GPIO 09 = "));
     Serial.println(receiver_input_channel_1);
-    Serial.print(F("GPIO 9 = "));
-    Serial.println(receiver_input_channel_2);
     Serial.print(F("GPIO 10 = "));
-    Serial.println(receiver_input_channel_3);
+    Serial.println(receiver_input_channel_2);
     Serial.print(F("GPIO 11 = "));
+    Serial.println(receiver_input_channel_3);
+    Serial.print(F("GPIO 12 = "));
     Serial.println(receiver_input_channel_4);
     Serial.println(F(""));
     Serial.println(F(""));
@@ -182,25 +182,25 @@ void loop(){
     Serial.println(F(""));
     Serial.println(F(""));
     Serial.println(F("Valores finais de ALTO, CENTRO, BAIXO detectados na configuração"));
-    Serial.print(F("GPIO 08:"));
+    Serial.print(F("GPIO 09:"));
     Serial.print(low_channel_1);
     Serial.print(F(" - "));
     Serial.print(center_channel_1);
     Serial.print(F(" - "));
     Serial.println(high_channel_1);
-    Serial.print(F("GPIO 9:"));
+    Serial.print(F("GPIO 10:"));
     Serial.print(low_channel_2);
     Serial.print(F(" - "));
     Serial.print(center_channel_2);
     Serial.print(F(" - "));
     Serial.println(high_channel_2);
-    Serial.print(F("GPIO 10:"));
+    Serial.print(F("GPIO 11:"));
     Serial.print(low_channel_3);
     Serial.print(F(" - "));
     Serial.print(center_channel_3);
     Serial.print(F(" - "));
     Serial.println(high_channel_3);
-    Serial.print(F("GPIO 11:"));
+    Serial.print(F("GPIO 12:"));
     Serial.print(low_channel_4);
     Serial.print(F(" - "));
     Serial.print(center_channel_4);
@@ -385,11 +385,11 @@ void loop(){
     Serial.println(F("==================================================="));
     Serial.println(F("Teste LED"));
     Serial.println(F("==================================================="));
-    digitalWrite(LED, HIGH);
+    digitalWrite(LED_R, HIGH);
     Serial.println(F("A LES tem que estar ligada agora"));
     Serial.println(F("Com o controle, simule o comando que levante a frente do drone para cima. Depois para a posição original para continuar"));
     check_to_continue();
-    digitalWrite(LED, LOW);
+    digitalWrite(LED_R, LOW);
   }
   
   Serial.println(F(""));
@@ -812,17 +812,17 @@ void check_giroscopio_axes(byte movement){
   
 }
 
-//Toda vez que houver uma mudança nos pinos 8, 9, 10 ou 11 o programa interrompe e executa isso:
+//Toda vez que houver uma mudança nos pinos 9, 10, 11 ou 12 o programa interrompe e executa isso:
 ISR(PCINT0_vect){
   current_time = micros();
   //Channel 1=========================================
-  if(PINB & B00000001){                                        //Is input 8 high?
-    if(antigo_canal_1 == 0){                                   //Input 8 changed from 0 to 1.
+  if(PINB & B00010000){                                        //Is input 12 high?
+    if(antigo_canal_1 == 0){                                   //Input 12 changed from 0 to 1.
       antigo_canal_1 = 1;                                      //Remember current input state.
       timer_1 = current_time;                                  //Set timer_1 to current_time.
     }
   }
-  else if(antigo_canal_1 == 1){                                //Input 8 is not high and changed from 1 to 0.
+  else if(antigo_canal_1 == 1){                                //Input 12 is not high and changed from 1 to 0.
     antigo_canal_1 = 0;                                        //Remember current input state.
     receiver_input_channel_1 = current_time - timer_1;                 //Channel 1 is current_time - timer_1.
   }

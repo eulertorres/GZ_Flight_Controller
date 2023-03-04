@@ -25,6 +25,9 @@
 #include <Wire.h>                          // Biblioteca para comunicação I²C com a MPU6050 e ADS1115
 #include <EEPROM.h>                        // Biblioteca pro armazenamento na memória EEPROM do Arduino
 
+#define G_LED 2
+#define R_LED 3
+#define B_LED 4
 
 //Ajuste de ganho do PID e Limites. É necessário ser feito manualmente
 //-----------------------------(Específico para o drone KRONOS MK I)--------------------------------
@@ -88,11 +91,13 @@ void setup(){
   TWBR = 12;                                                                // registrador do clock I²C como 400Khz
   
   // Configuração das portas de saída do arduino, o restante é entrada
-  DDRD |= B11110000;                                                        // Portas 4, 5, 6 e 7 do arduino como saídas
-  DDRB |= B00110000;                                                        // Portas 12 e 13 do arduino como saídas
+  DDRD |= B11111100;                                                        // Portas 2, 3 e 4 (LED); 5, 6, e 7 (ESCs) do atmega como saídas
+  DDRB |= B00000001;                                                        // Porta 8 como saída
 																			   
   // LED para indicar inincio da configuração                                   
-  digitalWrite(12,HIGH);                                                    // Liga a led
+  PORTD &= B11100011;			// Desliga os LEDs
+  PORTD |= B00010000;			// Liga verde
+  //digitalWrite(G_LED,HIGH);                                                    // Liga a led
 
   // Verificação de assinatura de Joop Brooking na memória EEPROM [Verifica se o Setup foi feito de maneiro correta]
   while(eeprom_data[33] != 'G' || eeprom_data[34] != '0')delay(10);
@@ -104,23 +109,24 @@ void setup(){
 
   //  Manda sinais para o motor ficar parado.
   for (cal_int = 0; cal_int < 1250 ; cal_int ++){                           // Espera 5 segundos antes de continuar (tenpo te rotina )
-    PORTD |= B11110000;                                                     // Porta 4, 5, 6 e 7 em nivel ALTO
+    PORTD |= B11100000; PORTB |= B00000001;                                                     // Porta 4, 5, 6 e 7 em nivel ALTO
     delayMicroseconds(1500);                                                // Espera 1.5 milisegundos (1500us).
-    PORTD &= B00001111;                                                     // Porta 4, 5, 6 e 7 nivel BAIXO
+    PORTD &= B00011111; PORTB |= B11111110;                                                    // Porta 4, 5, 6 e 7 nivel BAIXO
     delayMicroseconds(2500);                                                // Espera 2.5 ms
   }
 
+  PORTD &= B11100011;      // Desliga os LEDs
   // Calcula a média do erro do giroscópio a partir de 2000 amostras
   for (cal_int = 0; cal_int < 2000 ; cal_int ++){                           // Realiza a leitura de 2000 amostras do giroscópio
-    if(cal_int % 15 == 0)digitalWrite(12, !digitalRead(12));                // Led pisca para indicar calibração
+    if(cal_int % 15 == 0)digitalWrite(G_LED, !digitalRead(G_LED));                // Led pisca para indicar calibração
     gyro_signalen();                                                        // Leitura da saída da IMU
     gyro_axis_cal[1] += gyro_axis[1];                                       // Acumula o resultado do 1 byte (roll)
     gyro_axis_cal[2] += gyro_axis[2];                                       // Acumula o resultado do 2 byte (pitch)
     gyro_axis_cal[3] += gyro_axis[3];                                       // Acumula o resultado do 3 byte (yaw)
     // Envia pulsos de 1500 us para parar o motor [APENAS EM ESCs BIDIRECIONAIS ----CUIDADO-------]
-    PORTD |= B11110000;                                                     // Porta 4, 5, 6 e 7 em nivel ALTO
+    PORTD |= B11100000; PORTB |= B00000001;                                                     // Porta 4, 5, 6 e 7 em nivel ALTO
     delayMicroseconds(1500);                                                // Espera 1.5 milisegundos (1500us). (Desliga o motor)
-    PORTD &= B00001111;                                                     // Porta 4, 5, 6 e 7 nivel BAIXO
+    PORTD &= B00011111; PORTB |= B11111110;                                                    // Porta 4, 5, 6 e 7 nivel BAIXO
     delayMicroseconds(2500);                                                // Espera 2.5 ms [completa o período de 4 ms]
   }
   // Adquirimos a média simples das 2000 amostras para estimar o erro do giroscópio
@@ -129,11 +135,13 @@ void setup(){
   gyro_axis_cal[2] /= 2000;                                                 // Divide o pitch por 2000
 
   // Depois da calibração da IMU, habilitar a interrupção do micro
-  PCICR |= (1 << PCIE0);                                                    // Registeador PCIE0  em alto para habilitar scaneamento da interrupção através do PCMSK0
-  PCMSK0 |= (1 << PCINT0);                                                  // Registrador PCINT0 em alto (entrada digital 8)  para causar uma interrupção em qualquer mudança.
-  PCMSK0 |= (1 << PCINT1);                                                  // Registrador PCINT1 em alto (entrada digital 9)  para causar uma interrupção em qualquer mudança.
-  PCMSK0 |= (1 << PCINT2);                                                  // Registrador PCINT2 em alto (entrada digital 10) para causar uma interrupção em qualquer mudança.
-  PCMSK0 |= (1 << PCINT3);                                                  // Registrador PCINT3 em alto (entrada digital 11) para causar uma interrupção em qualquer mudança.
+  PCICR |= (1 << PCIE0);    // registrador PCIE0 em ALTO, para habilitar scaneamento do PCMSK0 (interrupção)
+  PCMSK0 |= (1 << PCINT1);  // PCINT1 em HIGH (GPIO 9) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT2);  // PCINT2 em HIGH (GPIO 10) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT3);  // PCINT3 em HIGH (GPIO 11) para acionar interrupção em qualquer mudança de nivel logico
+  PCMSK0 |= (1 << PCINT4);  // PCINT0 em HIGH (GPIO 8) para acionar interrupção em qualquer mudança de nivel logico
+
+  PORTD &= B11100011;			// Desliga os LEDs
 
   //Espera o throttle estar na menor posição (valor ja convertido em gyro_signalen()) e yaw no meio (impedir que drone realize algum movimento yaw)
   while(receiver_input_channel_3 < 1495 || receiver_input_channel_3 > 1510 || receiver_input_channel_4 < 1650){
@@ -141,12 +149,12 @@ void setup(){
     receiver_input_channel_4 = convert_receiver_channel(4);                 // Escalonamento para a faixa de 1500 a 2000 us (yaw)
     start ++;                                                               // Incrementa o contador para piscar a LED a cada 500 ms
     //Envia pulsos de 1500 us aos ESCs bidirecionais (para rotação)            
-    PORTD |= B11110000;                                                     // Porta 4, 5, 6 e 7 em nivel ALTO
+    PORTD |= B11100000; PORTB |= B00000001;                                                     // Porta 4, 5, 6 e 7 em nivel ALTO
     delayMicroseconds(1500);                                                // Espera 1.5 milisegundos (1500us) Para desligar os motores
-    PORTD &= B00001111;                                                     // Porta 4, 5, 6 e 7 nivel BAIXO
+    PORTD &= B00011111; PORTB |= B11111110;                                                    // Porta 4, 5, 6 e 7 nivel BAIXO
     delayMicroseconds(2500);													 			//Espera 2.5 ms
     if(start == 125){                                                       // A cada 500 ms
-      digitalWrite(12, !digitalRead(12));                                   // O led fica piscando
+      digitalWrite(B_LED, !digitalRead(B_LED));                                   // O led fica piscando
       start = 0;                                                            // Reseta o contador
     }                                                                          
   }                                                                            
@@ -160,7 +168,7 @@ void setup(){
   //Exemplo: Caso seja lido 787 na porta A0, o valor de tensão da bateria será 12.92 V
   battery_voltage = (analogRead(0) + 49) * 0.01642;
 
-  digitalWrite(12,LOW);                                                     //Desliga a LED
+  PORTD &= B11100011;			// Desliga os LEDs
   loop_timer = micros();													//Set the timer for the next loop.
 }
 
@@ -261,7 +269,7 @@ void loop(){
   //Compesação do descarga da bateria no contolador PID (com filtro complementar para reudizr o ruído da leitura analógica)
 	//0.09853 = 0.08 * 0.01642.
 	battery_voltage = battery_voltage * 0.92 + (analogRead(0) + 49) * 0.0013136;
-  if(battery_voltage < 14 && battery_voltage > 12.8)digitalWrite(12, HIGH);// Aviso caso o nivel da bateria esteja muito baixo (12.8 a  14V)
+  if(battery_voltage < 14 && battery_voltage > 12.8)digitalWrite(R_LED, HIGH);// Aviso caso o nivel da bateria esteja muito baixo (12.8 a  14V)
 
   throttle = receiver_input_channel_3;                                      // O throttle será o sinal de controle principal
 
@@ -303,11 +311,11 @@ void loop(){
   // O loop precisa necessáriamente ser menor que 4000 us (taxa de atualização dos ESCs ) - 250 Hz.|
   //================================================================================================
     
-  if(micros() - loop_timer > 4050)digitalWrite(12, HIGH);                   // Se o loop for maior que 4050 us, ligamos  LED de alerta
+  if(micros() - loop_timer > 4050)digitalWrite(R_LED, HIGH);                   // Se o loop for maior que 4050 us, ligamos  LED de alerta
   while(micros() - loop_timer < 4000);                                      // Esperamos o tempo que sobra no loop até comletar 4000us
   loop_timer = micros();                                                    // Zeramos o loop_timer para os próximos 4000 us
 																			   
-  PORTD |= B11110000;                                                       // Coloca os pinos 4, 5, 6 e 7 em alto
+  PORTD |= B11100000; PORTB |= B00000001;                                   // Coloca os pinos 4, 5, 6 e 7 em alto
   timer_channel_1 = esc_1 + loop_timer;                                     // Calcula o tempo em que o pulso do ESC 1 vai permanecer em ALTO
   timer_channel_2 = esc_2 + loop_timer;                                     // Calcula o tempo em que o pulso do ESC 2 vai permanecer em ALTO
   timer_channel_3 = esc_3 + loop_timer;                                     // Calcula o tempo em que o pulso do ESC 3 vai permanecer em ALTO
@@ -316,13 +324,13 @@ void loop(){
   //Sempre teremos 1550 us com o sinal em alto (valor mínimo enviado aos ESCs), então podemos aproveitar fazendo outra coisa
   //Adquire os valores de velocidade angular e aceleração da IMU para serem utilizado nos cálculos (isso demora ~600 us)
   gyro_signalen();
-
-  while(PORTD >= 16){                                                       // Entre neste loop até que todos os sinais estejam em BIAXO
-    esc_loop_timer = micros();                                              // Lê o tempo atual
-    if(timer_channel_1 <= esc_loop_timer)PORTD &= B11101111;                // Se o tempo atual for >= do tempo definido, o pino 1 é colocado em BAIXO
-    if(timer_channel_2 <= esc_loop_timer)PORTD &= B11011111;                // Se o tempo atual for >= do tempo definido, o pino 2 é colocado em BAIXO
-    if(timer_channel_3 <= esc_loop_timer)PORTD &= B10111111;                // Se o tempo atual for >= do tempo definido, o pino 3 é colocado em BAIXO
-    if(timer_channel_4 <= esc_loop_timer)PORTD &= B01111111;                // Se o tempo atual for >= do tempo definido, o pino 4 é colocado em BAIXO
+  
+    while((PORTD >= 16) || (PORTB%2)){                      // Entre neste loop até que todos os sinais estejam em BIAXO
+    esc_loop_timer = micros();                                   // Lê o tempo atual
+    if(timer_channel_1 <= esc_loop_timer)PORTB &= B11111110;     // Se o tempo atual for >= do tempo definido, o pino 1 é colocado em BAIXO
+    if(timer_channel_2 <= esc_loop_timer)PORTD &= B11011111;     // Se o tempo atual for >= do tempo definido, o pino 2 é colocado em BAIXO
+    if(timer_channel_3 <= esc_loop_timer)PORTD &= B10111111;     // Se o tempo atual for >= do tempo definido, o pino 3 é colocado em BAIXO
+    if(timer_channel_4 <= esc_loop_timer)PORTD &= B01111111;     // Se o tempo atual for >= do tempo definido, o pino 4 é colocado em BAIXO
   }
 }
 
@@ -522,7 +530,7 @@ void set_gyro_registers(){
     Wire.requestFrom(gyro_address, 1);                                         // Requisição de 1 byte do giroscópio
     while(Wire.available() < 1);                                               // Espera a recepção de 6 bytes
     if(Wire.read() != 0x08){                                                   // Checagem para ver se o valor é 0x08
-      digitalWrite(12,HIGH);                                                   // Liga LED de aviso
+      digitalWrite(R_LED,HIGH);                                                   // Liga LED de aviso
       while(1)delay(10);                                                       // Fica num loop infinito
     }                                                                             
 																				  
