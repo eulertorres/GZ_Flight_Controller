@@ -1,8 +1,7 @@
 # GZ_Flight_Controller V1.1
-
-[![English](https://img.shields.io/badge/Language-English-blue)](#english)
-[![Português (BR)](https://img.shields.io/badge/Idioma-PT--BR-green)](#português-br)
-[![中文](https://img.shields.io/badge/语言-中文-red)](#中文)
+[![Português (BR)](https://img.shields.io/badge/Idioma-PT--BR-green)](Docs/README_PT-BR.md)
+[![中文](https://img.shields.io/badge/语言-中文-red)](Docs/README_ZH.md)
+[![Deutsch](https://img.shields.io/badge/Sprache-Deutsch-black)](README_DE.md)
 
 ## English
 This repository brings three programs for controlling a drone with bi-directional ESCs (running in one-direction mode), using an ESP32 (in progress) or Arduino for setup, calibration, and control.
